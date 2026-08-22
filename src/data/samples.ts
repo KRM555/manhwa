@@ -34,43 +34,6 @@ export const SAMPLE_MANGA_PAGES: SampleManga[] = [
         y: 65,
         width: 38,
         height: 20,
-        originalText: "まさか…ここまで成長<dyad-write path="src/data/samples.ts" description="Sample manga pages for quick testing">
-import { SampleManga } from "@/types/manga";
-
-export const SAMPLE_MANGA_PAGES: SampleManga[] = [
-  {
-    id: "action-shonen",
-    title: "Battle Climax (Shonen)",
-    genre: "Action / Supernatural",
-    thumbnail: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80",
-    fullImage: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200&auto=format&fit=crop&q=80",
-    sampleBubbles: [
-      {
-        id: "b1",
-        x: 22,
-        y: 18,
-        width: 32,
-        height: 18,
-        originalText: "オレの本当の力を…見せてやる！",
-        translatedText: "سأريك... قوتي الحقيقية الآن!",
-        type: "speech"
-      },
-      {
-        id: "b2",
-        x: 62,
-        y: 35,
-        width: 25,
-        height: 15,
-        originalText: "ゴゴゴゴ… (ドドン)",
-        translatedText: "[صوت هدير قوي - دمرررر]",
-        type: "sfx"
-      },
-      {
-        id: "b3",
-        x: 35,
-        y: 65,
-        width: 38,
-        height: 20,
         originalText: "まさか…ここまで成長していたとは…！",
         translatedText: "لا يعقل... هل تطور إلى هذا الحد بالفعل...؟!",
         type: "thought"

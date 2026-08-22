@@ -78,22 +78,23 @@ export default function Index() {
       const base64Data = imagePreview.split(',')[1];
       const mimeType = imagePreview.split(';')[0].split(':')[1] || 'image/png';
 
-      const promptText = `Analyze this manga/comic page image. Perform OCR to extract all visible text blocks and Sound Effects (SFX).
-Translate each text block into ${config.targetLanguage === 'ar' ? 'Arabic' : config.targetLanguage}.
-Classify each text block into one of these categories: dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other.
+      const promptText = `You are a professional Manhua/Manga translator.
+1. Perform high-precision OCR to read Chinese/Japanese/Korean text (including vertical text and stylized sound effects).
+2. Translate the text into natural, fluent Arabic. Avoid literal translation; capture tone, context, and character emotions (e.g., cultivation terms, modern slang, honorifics).
+3. Identify the category: dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other.
 
-Return strictly a valid JSON array of objects without markdown headers or code block formatting like this:
+Return STRICTLY a raw JSON array like this:
 [
   {
     "id": "1",
-    "originalText": "original text here",
-    "translatedText": "translated text here",
+    "originalText": "النص الأصلي",
+    "translatedText": "الترجمة العربية الاحترافية",
     "category": "dialogue"
   }
 ]`;
 
       const response = await fetch(
-`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

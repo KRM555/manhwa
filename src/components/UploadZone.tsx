@@ -54,6 +54,63 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();<dyad-write path="src/components/UploadZone.tsx" description="Upload zone and translation configuration form">
+import React, { useRef, useState } from 'react';
+import { Upload, Image as ImageIcon, Sparkles, X, CheckCircle2, Sliders, Volume2, FileText, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import { TARGET_LANGUAGES, SAMPLE_MANGA_PAGES } from '@/data/samples';
+import { TranslationConfig, SampleManga } from '@/types/manga';
+import { toast } from 'sonner';
+
+interface UploadZoneProps {
+  imagePreview: string | null;
+  fileName: string | null;
+  config: TranslationConfig;
+  isAnalyzing: boolean;
+  onImageSelected: (url: string, name: string, sampleData?: SampleManga) => void;
+  onClearImage: () => void;
+  onConfigChange: (updated: Partial<TranslationConfig>) => void;
+  onAnalyze: () => void;
+}
+
+export const UploadZone: React.FC<UploadZoneProps> = ({
+  imagePreview,
+  fileName,
+  config,
+  isAnalyzing,
+  onImageSelected,
+  onClearImage,
+  onConfigChange,
+  onAnalyze,
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload a valid image file (PNG, JPG, WEBP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const url = e.target?.result as string;
+      onImageSelected(url, file.name);
+      toast.success(`Loaded image: ${file.name}`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };

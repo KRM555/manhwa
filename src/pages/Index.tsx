@@ -78,18 +78,29 @@ export default function Index() {
       const base64Data = imagePreview.split(',')[1];
       const mimeType = imagePreview.split(';')[0].split(':')[1] || 'image/png';
 
-      const promptText = `You are a professional Manhua/Manga translator.
-1. Perform high-precision OCR to read Chinese/Japanese/Korean text (including vertical text and stylized sound effects).
-2. Translate the text into natural, fluent Arabic. Avoid literal translation; capture tone, context, and character emotions (e.g., cultivation terms, modern slang, honorifics).
-3. Identify the category: dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other.
+      const promptText = `You are a professional Manhua/Manga/Manhwa translator and typesetter assistant.
 
-Return STRICTLY a raw JSON array like this:
+1. Perform OCR to extract all visible text (Chinese/Japanese/Korean) including vertical text and SFX.
+2. Translate each text block into fluent, natural Arabic capturing emotions, tone, and cultivation/slang context.
+3. Categorize each text block into one of these EXACT categories: 
+   - dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other.
+
+4. CRITICAL TYPER TOOL RULE (Prefixing Only): 
+   Place the formatting symbol strictly at the VERY BEGINNING of the "translatedText" string based on its category so that the Photoshop Typer extension can read it:
+   - scream / anger: Prefix with :: (e.g., ":: النص المترجم")
+   - thought: Prefix with () (e.g., "() النص المترجم")
+   - dialogue / whisper / fear / tension / pleasure / monster: Prefix with "" (e.g., '"" النص المترجم')
+   - sfx: Prefix with SFX: (e.g., "SFX: النص المترجم")
+   - narrator / other: Prefix with OT: (e.g., "OT: النص المترجم")
+   - system / phone / message: Prefix with [] (e.g., "[] النص المترجم")
+
+Return STRICTLY a raw JSON array of objects without markdown headers like this:
 [
   {
     "id": "1",
-    "originalText": "النص الأصلي",
-    "translatedText": "الترجمة العربية الاحترافية",
-    "category": "dialogue"
+    "originalText": "original text",
+    "translatedText": ":: النص المترجم",
+    "category": "scream"
   }
 ]`;
 

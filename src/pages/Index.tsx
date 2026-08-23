@@ -3,7 +3,7 @@ import { UploadZone } from '@/components/UploadZone';
 import { ResultsView } from '@/components/ResultsView';
 import { MangaPageItem } from '@/types/manga';
 import { toast } from 'sonner';
-import { KeyRound, Sparkles } from 'lucide-react';
+import { KeyRound, Sparkles, Image as ImageIcon, BookOpen } from 'lucide-react';
 
 export default function Index() {
   const [pages, setPages] = useState<MangaPageItem[]>([]);
@@ -125,46 +125,64 @@ Return STRICTLY a raw JSON array of objects without markdown headers like this:
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 flex flex-col justify-center py-12 px-4" dir="rtl">
-      {view === 'upload' ? (
-        <div className="mx-auto w-full max-w-xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center p-3 bg-orange-100 dark:bg-orange-950/50 text-orange-600 rounded-2xl mb-1">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              مترجم المانوا والتايبر الآلي
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              ارفع الفصول كملف ZIP أو صور متعددة لاستخراج النص وتنسيقه للتايبر فوراً
-            </p>
+    <div className="min-h-screen bg-background text-foreground flex flex-col" dir="rtl">
+      {/* Header Bar */}
+      <header className="border-b bg-card px-6 py-3 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 text-primary rounded-xl">
+            <BookOpen className="w-5 h-5" />
           </div>
-
-          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 p-4 rounded-xl space-y-2">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-orange-500" />
-              Gemini API Key:
-            </label>
-            <input
-              type="password"
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all font-mono"
-              placeholder="ضع الـ API Key الخاص بك هنا..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
+          <div>
+            <h1 className="font-bold text-lg leading-none">مترجم المانوا والتايبر الآلي</h1>
+            <span className="text-xs text-muted-foreground">TyperTool Automation Assistant</span>
           </div>
-
-          <UploadZone onStartProcessing={handleProcessPages} isAnalyzing={isAnalyzing} />
         </div>
-      ) : (
-        <ResultsView
-          pages={pages}
-          activePageIndex={activePageIndex}
-          setActivePageIndex={setActivePageIndex}
-          onReset={() => setView('upload')}
-          onUpdateBubble={handleUpdateBubble}
-        />
-      )}
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setView('upload')}
+            className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border transition-all ${
+              view === 'upload'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'hover:bg-accent border-transparent'
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>الصور البديلة / الرفع</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 container mx-auto py-8 px-4 max-w-5xl">
+        {view === 'upload' ? (
+          <div className="space-y-6">
+            <div className="bg-card border rounded-xl p-5 shadow-sm space-y-2">
+              <label className="text-sm font-semibold flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-primary" />
+                Gemini API Key:
+              </label>
+              <input
+                type="password"
+                className="w-full p-2.5 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                placeholder="ضع الـ API Key الخاص بك هنا..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+            </div>
+
+            <UploadZone onStartProcessing={handleProcessPages} isAnalyzing={isAnalyzing} />
+          </div>
+        ) : (
+          <ResultsView
+            pages={pages}
+            activePageIndex={activePageIndex}
+            setActivePageIndex={setActivePageIndex}
+            onReset={() => setView('upload')}
+            onUpdateBubble={handleUpdateBubble}
+          />
+        )}
+      </main>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { ResultsView } from '@/components/ResultsView';
 import { toast } from 'sonner';
-import { KeyRound, BookOpen, Settings2, Moon, Sun, Plus, Trash2, Save, X } from 'lucide-react';
+import { KeyRound, BookOpen, Settings2, Moon, Sun, Plus, Trash2, Save, X, Sparkles, Globe } from 'lucide-react';
 
 interface TyperRule {
   id: string;
@@ -29,7 +29,7 @@ export default function Index() {
   // General Options
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
   const [targetLang, setTargetLang] = useState<'ar' | 'en'>('ar');
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
   // Typer Tags Settings State
   const [typerRules, setTyperRules] = useState<TyperRule[]>(() => {
@@ -162,83 +162,102 @@ Return STRICTLY a raw JSON array of objects:
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors" dir="rtl">
-      {/* Header Bar */}
-      <header className="border-b border-orange-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-6 py-3 flex items-center justify-between shadow-sm">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans transition-colors" dir="rtl">
+      {/* Top Header */}
+      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-8 py-3.5 flex items-center justify-between shadow-2xl">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-500 text-white rounded-xl">
-            <BookOpen className="w-5 h-5" />
+          <div className="p-2.5 bg-gradient-to-tr from-orange-600 to-amber-500 text-white rounded-xl shadow-lg shadow-orange-500/20">
+            <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-bold text-lg leading-none dark:text-white">مترجم المانوا والتايبر الآلي</h1>
-            <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">TyperTool Assistant</span>
+            <h1 className="font-extrabold text-xl tracking-tight text-white flex items-center gap-2">
+              مترجم المانوا والتايبر الاحترافي
+              <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full font-mono">v2.0 PRO</span>
+            </h1>
+            <p className="text-xs text-slate-400">منصة التنضيد واستخراج النصوص الذكية لـ Photoshop</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Dark Mode Button */}
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700"
+            className="p-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 transition-all text-amber-400"
+            title="تبديل المظهر"
           >
-            {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5 text-slate-300" />}
           </button>
 
-          {/* Edit Typer Tags Button */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-2 text-sm px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700 font-medium"
+            className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 font-medium text-slate-200 transition-all shadow-sm"
           >
-            <Settings2 className="w-4 h-4 text-orange-500" />
+            <Settings2 className="w-4 h-4 text-orange-400" />
             <span>تعديل علامات التايبر</span>
           </button>
         </div>
       </header>
 
-      {/* Main Area */}
-      <main className="flex-1 container mx-auto py-8 px-4 max-w-4xl">
+      {/* Main Full-Width Container */}
+      <main className="flex-1 w-full px-6 py-6 flex flex-col">
         {view === 'upload' ? (
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-slate-800 border border-orange-200 dark:border-slate-700 rounded-xl p-5 shadow-sm space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold flex items-center gap-2 dark:text-white">
-                  <KeyRound className="w-4 h-4 text-orange-500" />
-                  Gemini API Key:
-                </label>
-                <input
-                  type="password"
-                  className="w-full p-3 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
-                  placeholder="ضع الـ API Key الخاص بك هنا..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-              </div>
-
-              {/* Target Translation Language Selector */}
-              <div className="flex items-center justify-between border-t dark:border-slate-700 pt-3">
-                <label className="text-sm font-bold dark:text-white">لغة الترجمة المطلوبة:</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTargetLang('ar')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
-                      targetLang === 'ar' ? 'bg-orange-500 text-white' : 'bg-slate-50 dark:bg-slate-700'
-                    }`}
-                  >
-                    العربية (Arabic)
-                  </button>
-                  <button
-                    onClick={() => setTargetLang('en')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
-                      targetLang === 'en' ? 'bg-orange-500 text-white' : 'bg-slate-50 dark:bg-slate-700'
-                    }`}
-                  >
-                    English (إنجليزية)
-                  </button>
+          <div className="max-w-6xl mx-auto w-full space-y-6 my-auto">
+            {/* Control Panel Card */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                
+                {/* API Key Section */}
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
+                    <KeyRound className="w-4 h-4 text-orange-400" />
+                    Gemini API Key:
+                  </label>
+                  <input
+                    type="password"
+                    className="w-full p-3.5 text-sm border border-slate-700 rounded-xl bg-slate-950/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 font-mono transition-all"
+                    placeholder="ضع الـ API Key الخاص بك هنا..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
                 </div>
+
+                {/* Target Language Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
+                    <Globe className="w-4 h-4 text-orange-400" />
+                    لغة الترجمة المطلوبة:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                    <button
+                      onClick={() => setTargetLang('ar')}
+                      className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                        targetLang === 'ar'
+                          ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      العربية (Arabic)
+                    </button>
+                    <button
+                      onClick={() => setTargetLang('en')}
+                      className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                        targetLang === 'en'
+                          ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      English
+                    </button>
+                  </div>
+                </div>
+
               </div>
             </div>
 
-            <UploadZone onStartProcessing={handleProcessPages} isAnalyzing={isAnalyzing} />
+            {/* Upload Zone */}
+            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-2 shadow-2xl">
+              <UploadZone onStartProcessing={handleProcessPages} isAnalyzing={isAnalyzing} />
+            </div>
           </div>
         ) : (
           <ResultsView
@@ -251,19 +270,22 @@ Return STRICTLY a raw JSON array of objects:
         )}
       </main>
 
-      {/* Embedded Tag Settings Modal */}
+      {/* Settings Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 w-full max-w-md space-y-4">
-            <div className="flex justify-between items-center border-b pb-2 dark:border-slate-700">
-              <h3 className="font-bold dark:text-white">تعديل علامات التايبر (Typer Tags)</h3>
-              <button onClick={() => setIsSettingsOpen(false)}>
-                <X className="w-5 h-5 text-slate-500" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-orange-400" />
+                إعدادات علامات التايبر (Typer Tags)
+              </h3>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {typerRules.map((rule, idx) => (
-                <div key={rule.id} className="flex gap-2 items-center">
+                <div key={rule.id} className="flex gap-2 items-center bg-slate-950/60 p-2 rounded-xl border border-slate-800">
                   <input
                     value={rule.name}
                     onChange={(e) => {
@@ -271,7 +293,8 @@ Return STRICTLY a raw JSON array of objects:
                       updated[idx].name = e.target.value;
                       setTyperRules(updated);
                     }}
-                    className="p-1.5 border rounded text-xs w-1/2 dark:bg-slate-700 dark:text-white"
+                    className="p-2 border border-slate-700 rounded-lg text-xs w-1/2 bg-slate-900 text-slate-200"
+                    placeholder="اسم التصنيف"
                   />
                   <input
                     value={rule.prefix}
@@ -280,11 +303,12 @@ Return STRICTLY a raw JSON array of objects:
                       updated[idx].prefix = e.target.value;
                       setTyperRules(updated);
                     }}
-                    className="p-1.5 border rounded text-xs w-1/3 font-mono dark:bg-slate-700 dark:text-white"
+                    className="p-2 border border-slate-700 rounded-lg text-xs w-1/3 font-mono bg-slate-900 text-orange-400 font-bold"
+                    placeholder="البادئة (Tag)"
                   />
                   <button
                     onClick={() => setTyperRules(typerRules.filter((r) => r.id !== rule.id))}
-                    className="text-red-500 p-1"
+                    className="text-red-400 hover:bg-red-500/10 p-2 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -298,19 +322,19 @@ Return STRICTLY a raw JSON array of objects:
                   { id: Date.now().toString(), name: 'تصنيف جديد', prefix: 'TAG:', categoryKey: `custom_${Date.now()}` },
                 ])
               }
-              className="w-full py-1.5 border border-dashed border-orange-400 text-orange-500 rounded text-xs font-bold flex items-center justify-center gap-1"
+              className="w-full py-2.5 border border-dashed border-orange-500/40 text-orange-400 hover:bg-orange-500/10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all"
             >
-              <Plus className="w-4 h-4" /> إضافة تصنيف
+              <Plus className="w-4 h-4" /> إضافة تصنيف جديد
             </button>
-            <div className="flex justify-end gap-2 pt-2 border-t dark:border-slate-700">
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
               <button
                 onClick={() => {
                   saveRulesToStorage(typerRules);
                   setIsSettingsOpen(false);
                 }}
-                className="px-4 py-1.5 bg-orange-500 text-white rounded text-xs font-bold flex items-center gap-1"
+                className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-orange-500/20"
               >
-                <Save className="w-4 h-4" /> حفظ القواعد
+                <Save className="w-4 h-4" /> حفظ وإغلاق
               </button>
             </div>
           </div>

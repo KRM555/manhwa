@@ -133,3 +133,28 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #f97316;
 }
+/* Custom Scrollbar styled like v0 interface */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0f172a; /* خلفية داكنة متناسقة */
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #f97316; /* لون برتقالي زي الواجهة */
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #ea580c; /* برتقالي أغمق عند التمرير */
+}
+
+/* للمتصفحات الأخرى مثل Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #f97316 #0f172a;
+}

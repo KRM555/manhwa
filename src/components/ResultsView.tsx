@@ -1,212 +1,104 @@
 import React from 'react';
-import { MangaPageItem, DetectedBubble } from '@/types/manga';
-import { TyperItemCard } from '@/components/TyperItemCard';
-import {
-  ArrowLeft,
-  Download,
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  Copy,
-  Info,
-  FileDown,
-} from 'lucide-react';
+import { MangaPageItem } from '@/types/manga';
+import { TyperItemCard } from './TyperItemCard';
+import { exportToWord, exportToTxt } from '@/utils/typerHelper';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { FileText, Download, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface ResultsViewProps {
   pages: MangaPageItem[];
   activePageIndex: number;
-  selectedLangObj?: { code: string; name: string; flag: string; rtl: boolean };
-  isRTL: boolean;
-  isExportingDocx: boolean;
-  onBackToUpload: () => void;
-  onSelectPageIndex: (index: number) => void;
-  onExportDocx: () => void;
-  onExportTxt: () => void;
-  onUpdateItem: (pageIdx: number, itemId: string, field: keyof DetectedBubble, value: string) => void;
+  setActivePageIndex: (index: number) => void;
+  onReset: () => void;
+  onUpdateBubble: (pageId: string, bubbleId: string, updatedText: string, category: string) => void;
 }
 
 export const ResultsView: React.FC<ResultsViewProps> = ({
   pages,
   activePageIndex,
-  selectedLangObj,
-  isRTL,
-  isExportingDocx,
-  onBackToUpload,
-  onSelectPageIndex,
-  onExportDocx,
-  onExportTxt,
-  onUpdateItem,
+  setActivePageIndex,
+  onReset,
+  onUpdateBubble,
 }) => {
-  const currentPage = pages[activePageIndex] || pages[0];
+  const currentPage = pages[activePageIndex];
 
-  const handleCopyPageText = (page: MangaPageItem) => {
-    const text = (page.items || []).map((it) => it.translatedText).join('\n');
-    navigator.clipboard.writeText(text);
-    toast.success(`تم نسخ نصوص الصفحة ${page.fileName} إلى الحافظة!`);
-  };
+  if (!currentPage) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Action Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-card p-4 rounded-3xl border border-border shadow-sm">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={onBackToUpload} className="rounded-xl text-xs font-bold gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            العودة للرفع
+    <div className="container mx-auto p-4 space-y-6" dir="rtl">
+      {/* Header Actions */}
+      <div className="flex flex-wrap justify-between items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
+        <Button variant="outline" onClick={onReset}>
+          رفع صور جديدة
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => exportToTxt(pages)}>
+            <FileText className="w-4 h-4 ml-2" />
+            تصدير TXT
           </Button>
-          <Badge className="bg-orange-600 text-white font-bold">
-            {selectedLangObj?.flag} {selectedLangObj?.name || 'Arabic'}
-          </Badge>
-          <span className="text-xs font-bold text-muted-foreground">
-            إجمالي الصفحات: {pages.length}
+          <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => exportToWord(pages)}>
+            <Download className="w-4 h-4 ml-2" />
+            تصدير Word (.docx)
+          </Button>
+        </div>
+      </div>
+
+      {/* Pagination Bar */}
+      {pages.length > 1 && (
+        <div className="flex items-center justify-center gap-4 bg-muted/40 p-2 rounded-md">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={activePageIndex === 0}
+            onClick={() => setActivePageIndex(activePageIndex - 1)}
+          >
+            <ArrowRight className="w-4 h-4 ml-1" /> الصفحة السابقة
+          </Button>
+          <span className="text-sm font-medium">
+            صفحة {activePageIndex + 1} من {pages.length} ({currentPage.fileName})
           </span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
           <Button
-            variant="outline"
-            disabled={isExportingDocx}
-            onClick={onExportDocx}
-            className="border-blue-600/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-xs rounded-xl gap-2 h-9"
+            size="sm"
+            variant="ghost"
+            disabled={activePageIndex === pages.length - 1}
+            onClick={() => setActivePageIndex(activePageIndex + 1)}
           >
-            <FileDown className="w-4 h-4" />
-            {isExportingDocx ? 'جاري التوليد...' : 'تصدير Word (.docx)'}
+            الصفحة التالية <ArrowLeft className="w-4 h-4 mr-1" />
           </Button>
-
-          <Button
-            onClick={onExportTxt}
-            className="bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-orange-600/20 gap-2 h-9"
-          >
-            <Download className="w-4 h-4" />
-            تصدير سكريبت التايبر (.txt)
-          </Button>
-        </div>
-      </div>
-
-      {/* Pages selector ribbon */}
-      <div className="flex items-center gap-2 overflow-x-auto p-2 bg-muted/40 rounded-2xl border border-border">
-        <span className="text-xs font-bold text-muted-foreground shrink-0 px-2">الصفحات:</span>
-        {pages.map((p, idx) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => onSelectPageIndex(idx)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border ${
-              idx === activePageIndex
-                ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
-                : 'bg-card hover:bg-accent text-muted-foreground border-border'
-            }`}
-          >
-            <span>صفحة #{idx + 1}</span>
-            {p.status === 'completed' && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
-            {p.status === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
-          </button>
-        ))}
-      </div>
-
-      {/* Main Grid */}
-      {currentPage && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Manga Image Viewer */}
-          <Card className="rounded-3xl overflow-hidden border-border bg-card shadow-sm sticky top-24">
-            <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-foreground">
-                  صفحة #{activePageIndex + 1}: {currentPage.fileName}
-                </span>
-                <Badge variant="outline" className="text-[10px]">
-                  {currentPage.items?.length || 0} فقرات
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={activePageIndex === 0}
-                  onClick={() => onSelectPageIndex(Math.max(0, activePageIndex - 1))}
-                  className="h-8 w-8 rounded-lg"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={activePageIndex === pages.length - 1}
-                  onClick={() => onSelectPageIndex(Math.min(pages.length - 1, activePageIndex + 1))}
-                  className="h-8 w-8 rounded-lg"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            <CardContent className="p-4 flex items-center justify-center bg-zinc-950/5 dark:bg-zinc-900/50 min-h-[480px]">
-              <img
-                src={currentPage.previewUrl}
-                alt={currentPage.fileName}
-                className="max-h-[640px] w-auto object-contain rounded-xl shadow-md"
-              />
-            </CardContent>
-          </Card>
-
-          {/* Right Column: Bubble / Typer Cards */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-2xl border border-border">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-orange-500" />
-                <span className="font-extrabold text-sm">نصوص الصفحة #{activePageIndex + 1}</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleCopyPageText(currentPage)}
-                className="text-xs rounded-xl h-8 font-semibold"
-              >
-                <Copy className="w-3.5 h-3.5 mr-1" />
-                نسخ نصوص هذه الصفحة
-              </Button>
-            </div>
-
-            {/* Quick Typer Legend */}
-            <div className="p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
-              <Info className="w-4 h-4 text-orange-500 shrink-0" />
-              <span className="font-bold text-foreground">رموز التايبر:</span>
-              <span className="bg-background px-1.5 py-0.5 rounded border text-[11px] font-mono">:: للصراخ</span>
-              <span className="bg-background px-1.5 py-0.5 rounded border text-[11px] font-mono">() للأفكار</span>
-              <span className="bg-background px-1.5 py-0.5 rounded border text-[11px] font-mono">"" للحوار</span>
-              <span className="bg-background px-1.5 py-0.5 rounded border text-[11px] font-mono">SFX: للمؤثرات</span>
-              <span className="bg-background px-1.5 py-0.5 rounded border text-[11px] font-mono">[] للنظام</span>
-              <span className="bg-background px-1.5 py-0.5 rounded border text-[11px] font-mono">OT: للراوي</span>
-            </div>
-
-            {/* List of items */}
-            <div className="space-y-4 max-h-[640px] overflow-y-auto pr-1">
-              {!currentPage.items || currentPage.items.length === 0 ? (
-                <div className="text-center py-12 bg-card rounded-2xl border border-border">
-                  <p className="text-sm text-muted-foreground">لم يتم العثور على حوارات أو نصوص في هذه الصفحة.</p>
-                </div>
-              ) : (
-                currentPage.items.map((item, idx) => (
-                  <TyperItemCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    isRTL={isRTL}
-                    onUpdate={(field, val) => onUpdateItem(activePageIndex, item.id, field, val)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
         </div>
       )}
+
+      {/* Main Content View */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Left: Image Preview */}
+        <div className="border rounded-lg overflow-hidden bg-black/5 flex items-center justify-center p-2">
+          <img
+            src={currentPage.imageUrl}
+            alt={currentPage.fileName}
+            className="max-h-[75vh] object-contain rounded-md"
+          />
+        </div>
+
+        {/* Right: Extracted & Formatted Bubbles */}
+        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
+          <h3 className="font-bold text-lg border-b pb-2">
+            النصوص المترجمة (صفحة {activePageIndex + 1})
+          </h3>
+          {currentPage.bubbles.length === 0 ? (
+            <p className="text-muted-foreground text-sm">لم يتم اكتشاف أي نصوص في هذه الصفحة.</p>
+          ) : (
+            currentPage.bubbles.map((bubble) => (
+              <TyperItemCard
+                key={bubble.id}
+                item={bubble}
+                onChange={(updatedText, category) =>
+                  onUpdateBubble(currentPage.id, bubble.id, updatedText, category)
+                }
+              />
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };

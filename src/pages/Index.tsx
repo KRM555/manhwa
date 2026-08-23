@@ -7,11 +7,9 @@ import { TARGET_LANGUAGES } from '@/data/samples';
 import {
   ArrowLeft,
   Download,
-  Save,
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  Layers,
   CheckCircle2,
   AlertCircle,
   FileText,
@@ -85,7 +83,6 @@ export default function Index() {
       const page = updatedPages[i];
       setProcessingProgress({ current: i + 1, total: updatedPages.length });
 
-      // Update status to processing
       page.status = 'processing';
       setPages([...updatedPages]);
 
@@ -178,7 +175,6 @@ Return strictly a valid JSON array of objects without Markdown code wrappers:
 
       setPages([...updatedPages]);
 
-      // Small delay between requests to protect API limits
       if (i < updatedPages.length - 1) {
         await new Promise((res) => setTimeout(res, 600));
       }
@@ -199,149 +195,8 @@ Return strictly a valid JSON array of objects without Markdown code wrappers:
         if (item.id !== itemId) return item;
 
         if (field === 'category') {
-          // Re-apply prefix automatically when category changes
           const updatedTranslation = applyTyperPrefix(item.translatedText, value);
-          return { ...item, category: value, translatedText: updatedTranslation };
-        }
-
-        return { ...item, [field]: value };
-      });
-
-      return copy;
-    });
-  };
-
-  const handleExportAllTxt = () => {
-    if (pages.length === 0) return;
-    const textContent = generateChapterTextFile(pages);
-    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Manga_Chapter_Typer_Script_${Date.now()}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success('تم تحميل سكريبت التايبر (.txt) لجميع صفحات الفصل بنجاح!');
-  };
-
-  const handleExportDocx = async () => {
-    if (pages.length === 0) return;
-    try {
-      setIsExportingDocx(true);
-      await exportChapterToDocx(pages, isRTL);
-      toast.success('تم إنشاء وتحميل ملف Word (.docx) بنجاح!');
-    } catch (err: any) {
-      console.error(err);
-      toast.error('حدث خطأ أثناء إنشاء ملف Word: ' + (err.message || ''));
-    } finally {
-      setIsExportingDocx(false);
-    }
-  };
-
-  const handleCopyPageText = (page: MangaPageItem) => {
-    const text = page.items.map((it) => it.translatedText).join('\n');
-    navigator.clipboard.writeText(text);
-    toast.success(`تم نسخ نصوص الصفحة ${page.fileName} إلى الحافظة!`);
-  };
-
-  const currentPage = pages[activePageIndex] || pages[0];
-
-  return (
-    <div className="min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Header & Key Input */}
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-border pb-5 gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 bg-clip-text text-transparent">
-              Manga Typer Studio AI
-            </h1>
-            <Badge className="bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border-orange-200">
-              Batch & ZIP Ready
-            </Badge>
-          </div>
-          <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">
-            استخراج وترجمة صفحات المانجا والفصول كاملة بصيغة متوافقة 100% مع إضافة Photoshop Typer
-          </p>
-        </div>
-
-        {/* API Key Box */}
-        <div className="flex items-center gap-2 bg-muted/60 p-2.5 rounded-2xl border border-border w-full md:w-auto shadow-sm">
-          <div className="w-8 h-8 rounded-xl bg-orange-600/10 text-orange-600 flex items-center justify-center shrink-0">
-            <Key className="w-4 h-4" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gemini API Key</span>
-            <input
-              type="password"
-              placeholder="ألصق الـ API Key هنا"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="bg-transparent text-xs font-semibold outline-none w-full sm:w-64 placeholder:text-muted-foreground/60"
-            />
-          </div>
-        </div>
-      </header>
-
-      {/* Sequential Processing Banner */}
-      {isAnalyzing && (
-        <Card className="border-orange-500/40 bg-orange-50/30 dark:bg-orange-950/20 rounded-2xl p-5 shadow-md animate-in fade-in">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center animate-spin">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-foreground">
-                    جاري معالجة صفحات الفصل تسلسلياً ({processingProgress.current} / {processingProgress.total})
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    جاري فحص الصفحة: {pages[processingProgress.current - 1]?.fileName || '...'}
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs font-black text-orange-600 bg-orange-100 dark:bg-orange-900/50 px-3 py-1 rounded-full">
-                {Math.round((processingProgress.current / (processingProgress.total || 1)) * 100)}%
-              </span>
-            </div>
-            <Progress
-              value={(processingProgress.current / (processingProgress.total || 1)) * 100}
-              className="h-2 rounded-full"
-            />
-          </div>
-        </Card>
-      )}
-
-      {/* Main View Switcher */}
-      {view === 'upload' ? (
-        <UploadZone
-          pages={pages}
-          config={config}
-          isAnalyzing={isAnalyzing}
-          onAddPages={handleAddPages}
-          onRemovePage={handleRemovePage}
-          onClearAll={handleClearAll}
-          onConfigChange={handleConfigChange}
-          onAnalyzeAll={handleAnalyzeAll}
-        />
-      ) : (
-        /* Results View */
-        <div className="space-y-6">
-          {/* Top Results Navigation Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 bg-card p-4 rounded-3xl border border-border shadow-sm">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setView('upload')}
-                className="rounded-xl text-xs font-bold gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                العودة للرفع
-              </Button>
-
-              <Badge className="bg-orange-600 text-white font-<dyad-write path="src/pages/Index.tsx" description="Main studio page with batch queue processing, dynamic bidirectional text support, and Word (.docx) & Text (.txt) export">
+          return { ...item, category: value, translatedText:<dyad-write path="src/pages/Index.tsx" description="Fix syntax error and cleanly restore Index page with Word and TXT exports">
 import React, { useState } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { TranslationConfig, MangaPageItem, DetectedBubble } from '@/types/manga';

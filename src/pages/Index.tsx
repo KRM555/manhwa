@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { TranslationConfig, MangaPageItem, DetectedBubble } from '@/types/manga';
 import { CATEGORIES, applyTyperPrefix, generateChapterTextFile } from '@/utils/typerHelper';
+import { exportChapterToDocx } from '@/utils/docxExport';
 import { TARGET_LANGUAGES } from '@/data/samples';
 import {
   ArrowLeft,
@@ -16,7 +17,8 @@ import {
   FileText,
   Copy,
   Key,
-  Info
+  Info,
+  FileDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +33,7 @@ export default function Index() {
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [processingProgress, setProcessingProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [apiKey, setApiKey] = useState<string>(localStorage.getItem('gemini_api_key') || '');
 
@@ -223,6 +226,20 @@ Return strictly a valid JSON array of objects without Markdown code wrappers:
     toast.success('تم تحميل سكريبت التايبر (.txt) لجميع صفحات الفصل بنجاح!');
   };
 
+  const handleExportDocx = async () => {
+    if (pages.length === 0) return;
+    try {
+      setIsExportingDocx(true);
+      await exportChapterToDocx(pages, isRTL);
+      toast.success('تم إنشاء وتحميل ملف Word (.docx) بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء إنشاء ملف Word: ' + (err.message || ''));
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
   const handleCopyPageText = (page: MangaPageItem) => {
     const text = page.items.map((it) => it.translatedText).join('\n');
     navigator.clipboard.writeText(text);
@@ -324,6 +341,345 @@ Return strictly a valid JSON array of objects without Markdown code wrappers:
                 العودة للرفع
               </Button>
 
+              <Badge className="bg-orange-600 text-white font-<dyad-write path="src/pages/Index.tsx" description="Main studio page with batch queue processing, dynamic bidirectional text support, and Word (.docx) & Text (.txt) export">
+import React, { useState } from 'react';
+import { UploadZone } from '@/components/UploadZone';
+import { TranslationConfig, MangaPageItem, DetectedBubble } from '@/types/manga';
+import { CATEGORIES, applyTyperPrefix, generateChapterTextFile } from '@/utils/typerHelper';
+import { exportChapterToDocx } from '@/utils/docxExport';
+import { TARGET_LANGUAGES } from '@/data/samples';
+import {
+  ArrowLeft,
+  Download,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Copy,
+  Key,
+  Info,
+  FileDown
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+
+export default function Index() {
+  const [pages, setPages] = useState<MangaPageItem[]>([]);
+  const [activePageIndex, setActivePageIndex] = useState<number>(0);
+  const [view, setView] = useState<'upload' | 'results'>('upload');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [apiKey, setApiKey] = useState<string>(localStorage.getItem('gemini_api_key') || '');
+
+  const [config, setConfig] = useState<TranslationConfig>({
+    targetLanguage: 'ar',
+    extractSFX: true,
+    detectVerticalText: true,
+  });
+
+  const selectedLangObj = TARGET_LANGUAGES.find((l) => l.code === config.targetLanguage);
+  const isRTL = selectedLangObj?.rtl ?? true;
+
+  const handleAddPages = (newPages: MangaPageItem[]) => {
+    setPages((prev) => [...prev, ...newPages]);
+  };
+
+  const handleRemovePage = (id: string) => {
+    setPages((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleClearAll = () => {
+    setPages([]);
+    setActivePageIndex(0);
+  };
+
+  const handleConfigChange = (updated: Partial<TranslationConfig>) => {
+    setConfig((prev) => ({ ...prev, ...updated }));
+  };
+
+  // Sequential batch processing to respect rate limits
+  const handleAnalyzeAll = async () => {
+    if (pages.length === 0) {
+      toast.error('يرجى رفع صور أو ملف ZIP أولاً');
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      toast.error('يرجى إدخال مفتاح Gemini API في الشريط العلوي لبدء الاستخراج والترجمة');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    localStorage.setItem('gemini_api_key', apiKey.trim());
+    setProcessingProgress({ current: 0, total: pages.length });
+
+    const updatedPages = [...pages];
+
+    for (let i = 0; i < updatedPages.length; i++) {
+      const page = updatedPages[i];
+      setProcessingProgress({ current: i + 1, total: updatedPages.length });
+
+      page.status = 'processing';
+      setPages([...updatedPages]);
+
+      try {
+        const base64Data = page.previewUrl.split(',')[1];
+        const mimeType = page.previewUrl.split(';')[0].split(':')[1] || 'image/png';
+
+        const promptText = `You are an elite Manga/Manhwa/Manhua translation and typesetting OCR engine.
+
+Target Language: ${selectedLangObj?.name || 'Arabic'}
+
+TASKS:
+1. Extract every speech bubble, monologue box, scream balloon, narrator note, and onomatopoeia SFX.
+2. Translate all extracted text into high-quality, culturally nuanced ${selectedLangObj?.name || 'Arabic'}.
+3. Assign each element strictly one of these exact categories:
+   - dialogue (normal conversation)
+   - thought (internal thoughts)
+   - scream (yelling/shouting)
+   - whisper (whispers)
+   - anger (rage/furious shout)
+   - fear (scared/trembling)
+   - tension (tense moments)
+   - pleasure (sighs/laughter)
+   - monster (beast speech/growls)
+   - system (status windows/game alerts)
+   - phone (phone calls/smartphones)
+   - message (text messages)
+   - sfx (sound effects, hits, thuds)
+   - narrator (story narration)
+   - other
+
+4. PHOTOSHOP TYPER SCRIPT FORMATTING RULES (Apply to 'translatedText'):
+   - scream OR anger: Must start with :: (e.g. ":: سأقضي عليك!")
+   - thought: Must be enclosed in () (e.g. "(هل كان يخدعني طوال الوقت؟)")
+   - sfx: Must start with SFX: (e.g. "SFX: [صوت انفجار قوي - بااام]")
+   - narrator OR other: Must start with OT: (e.g. "OT: في تلك الليلة المظلمة...")
+   - system OR phone OR message: Must be enclosed in [] (e.g. "[تم تفعيل المهارة الخاصة]")
+   - dialogue / whisper / fear / tension / pleasure / monster: Must be enclosed in "" (e.g. "\\"لا تقلق، كل شيء تحت السيطرة\\"")
+
+OUTPUT FORMAT:
+Return strictly a valid JSON array of objects without Markdown code wrappers:
+[
+  {
+    "id": "1",
+    "originalText": "original text here",
+    "translatedText": ":: النص المترجم",
+    "category": "scream"
+  }
+]`;
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey.trim()}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: promptText },
+                    { inline_data: { mime_type: mimeType, data: base64Data } },
+                  ],
+                },
+              ],
+            }),
+          }
+        );
+
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error.message || 'API request error');
+        }
+
+        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        const cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsedItems: DetectedBubble[] = JSON.parse(cleanJson);
+
+        page.items = parsedItems.map((item, idx) => ({
+          id: item.id || `b-${i}-${idx}`,
+          originalText: item.originalText || '',
+          translatedText: item.translatedText || '',
+          category: item.category || 'dialogue',
+        }));
+        page.status = 'completed';
+      } catch (err: any) {
+        console.error(`Error analyzing page ${page.fileName}:`, err);
+        page.status = 'error';
+        page.error = err.message || 'حدث خطأ أثناء معالجة الصفحة';
+      }
+
+      setPages([...updatedPages]);
+
+      if (i < updatedPages.length - 1) {
+        await new Promise((res) => setTimeout(res, 600));
+      }
+    }
+
+    setIsAnalyzing(false);
+    setView('results');
+    toast.success('اكتملت معالجة جميع صفحات الفصل!');
+  };
+
+  const updateItem = (pageIdx: number, itemId: string, field: keyof DetectedBubble, value: string) => {
+    setPages((prev) => {
+      const copy = [...prev];
+      const page = copy[pageIdx];
+      if (!page) return prev;
+
+      page.items = page.items.map((item) => {
+        if (item.id !== itemId) return item;
+
+        if (field === 'category') {
+          const updatedTranslation = applyTyperPrefix(item.translatedText, value);
+          return { ...item, category: value, translatedText: updatedTranslation };
+        }
+
+        return { ...item, [field]: value };
+      });
+
+      return copy;
+    });
+  };
+
+  const handleExportAllTxt = () => {
+    if (pages.length === 0) return;
+    const textContent = generateChapterTextFile(pages);
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Manga_Chapter_Typer_Script_${Date.now()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('تم تحميل سكريبت التايبر (.txt) بنجاح!');
+  };
+
+  const handleExportDocx = async () => {
+    if (pages.length === 0) return;
+    try {
+      setIsExportingDocx(true);
+      await exportChapterToDocx(pages, isRTL);
+      toast.success('تم إنشاء وتحميل ملف Word (.docx) بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء إنشاء ملف Word: ' + (err.message || ''));
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
+  const handleCopyPageText = (page: MangaPageItem) => {
+    const text = page.items.map((it) => it.translatedText).join('\n');
+    navigator.clipboard.writeText(text);
+    toast.success(`تم نسخ نصوص الصفحة ${page.fileName} إلى الحافظة!`);
+  };
+
+  const currentPage = pages[activePageIndex] || pages[0];
+
+  return (
+    <div className="min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Top Header & Key Input */}
+      <header className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-border pb-5 gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 bg-clip-text text-transparent">
+              Manga Typer Studio AI
+            </h1>
+            <Badge className="bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border-orange-200">
+              Batch & ZIP Ready
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">
+            استخراج وترجمة صفحات المانجا والفصول كاملة بصيغة متوافقة 100% مع إضافة Photoshop Typer وتصدير Word/TXT
+          </p>
+        </div>
+
+        {/* API Key Box */}
+        <div className="flex items-center gap-2 bg-muted/60 p-2.5 rounded-2xl border border-border w-full md:w-auto shadow-sm">
+          <div className="w-8 h-8 rounded-xl bg-orange-600/10 text-orange-600 flex items-center justify-center shrink-0">
+            <Key className="w-4 h-4" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gemini API Key</span>
+            <input
+              type="password"
+              placeholder="ألصق الـ API Key هنا"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="bg-transparent text-xs font-semibold outline-none w-full sm:w-64 placeholder:text-muted-foreground/60"
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* Sequential Processing Banner */}
+      {isAnalyzing && (
+        <Card className="border-orange-500/40 bg-orange-50/30 dark:bg-orange-950/20 rounded-2xl p-5 shadow-md animate-in fade-in">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center animate-spin">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-foreground">
+                    جاري معالجة صفحات الفصل تسلسلياً ({processingProgress.current} / {processingProgress.total})
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    جاري فحص الصفحة: {pages[processingProgress.current - 1]?.fileName || '...'}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-black text-orange-600 bg-orange-100 dark:bg-orange-900/50 px-3 py-1 rounded-full">
+                {Math.round((processingProgress.current / (processingProgress.total || 1)) * 100)}%
+              </span>
+            </div>
+            <Progress
+              value={(processingProgress.current / (processingProgress.total || 1)) * 100}
+              className="h-2 rounded-full"
+            />
+          </div>
+        </Card>
+      )}
+
+      {/* Main View Switcher */}
+      {view === 'upload' ? (
+        <UploadZone
+          pages={pages}
+          config={config}
+          isAnalyzing={isAnalyzing}
+          onAddPages={handleAddPages}
+          onRemovePage={handleRemovePage}
+          onClearAll={handleClearAll}
+          onConfigChange={handleConfigChange}
+          onAnalyzeAll={handleAnalyzeAll}
+        />
+      ) : (
+        /* Results View */
+        <div className="space-y-6">
+          {/* Top Results Navigation Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-card p-4 rounded-3xl border border-border shadow-sm">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setView('upload')}
+                className="rounded-xl text-xs font-bold gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                العودة للرفع
+              </Button>
+
               <Badge className="bg-orange-600 text-white font-bold">
                 {selectedLangObj?.flag} {selectedLangObj?.name || 'Arabic'}
               </Badge>
@@ -332,13 +688,23 @@ Return strictly a valid JSON array of objects without Markdown code wrappers:
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                disabled={isExportingDocx}
+                onClick={handleExportDocx}
+                className="border-blue-600/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-xs rounded-xl gap-2 h-9"
+              >
+                <FileDown className="w-4 h-4" />
+                {isExportingDocx ? 'جاري التوليد...' : 'تصدير Word (.docx)'}
+              </Button>
+
               <Button
                 onClick={handleExportAllTxt}
                 className="bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-orange-600/20 gap-2 h-9"
               >
                 <Download className="w-4 h-4" />
-                تصدير سكريبت التايبر الكامل (.txt)
+                تصدير سكريبت التايبر (.txt)
               </Button>
             </div>
           </div>

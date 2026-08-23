@@ -125,26 +125,26 @@ Return STRICTLY a raw JSON array of objects without markdown headers like this:
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col" dir="rtl">
-      {/* Header Bar */}
-      <header className="border-b bg-card px-6 py-3 flex items-center justify-between shadow-sm">
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans" dir="rtl">
+      {/* Colored Header Bar */}
+      <header className="border-b border-orange-200 bg-white px-6 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 text-primary rounded-xl">
+          <div className="p-2.5 bg-orange-500 text-white rounded-xl shadow-sm">
             <BookOpen className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-lg leading-none">مترجم المانوا والتايبر الآلي</h1>
-            <span className="text-xs text-muted-foreground">TyperTool Automation Assistant</span>
+            <h1 className="font-bold text-lg text-slate-900 leading-none">مترجم المانوا والتايبر الآلي</h1>
+            <span className="text-xs text-orange-600 font-medium">TyperTool Automation Assistant</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView('upload')}
-            className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border transition-all ${
+            className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg border font-medium transition-all ${
               view === 'upload'
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'hover:bg-accent border-transparent'
+                ? 'bg-orange-500 text-white border-orange-600 shadow-sm'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
             }`}
           >
             <ImageIcon className="w-4 h-4" />
@@ -154,17 +154,18 @@ Return STRICTLY a raw JSON array of objects without markdown headers like this:
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 container mx-auto py-8 px-4 max-w-5xl">
+      <main className="flex-1 container mx-auto py-8 px-4 max-w-4xl">
         {view === 'upload' ? (
           <div className="space-y-6">
-            <div className="bg-card border rounded-xl p-5 shadow-sm space-y-2">
-              <label className="text-sm font-semibold flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-primary" />
+            {/* Orange Themed API Key Box */}
+            <div className="bg-white border border-orange-200 rounded-xl p-5 shadow-sm space-y-2">
+              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-orange-500" />
                 Gemini API Key:
               </label>
               <input
                 type="password"
-                className="w-full p-2.5 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                className="w-full p-3 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono transition-all"
                 placeholder="ضع الـ API Key الخاص بك هنا..."
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}

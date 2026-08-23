@@ -53,7 +53,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   if (!currentPage) return null;
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-90px)] gap-4">
+    <div className="flex-1 flex flex-col h-[calc(100vh-100px)] gap-4">
       {/* Top Action Control Toolbar */}
       <div className="flex items-center justify-between p-3.5 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg">
         <button
@@ -109,56 +109,66 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
         </div>
       </div>
 
-      {/* Main Workspace Workspace Layout */}
-      <div className="flex-1 grid grid-cols-12 gap-4 min-h-0">
+      {/* Main Workspace Layout */}
+      <div className="flex-1 grid grid-cols-12 gap-4 h-full min-h-0 overflow-hidden">
         
-        {/* Pages Sidebar list */}
-        <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-3 overflow-y-auto">
-          <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5 border-b border-slate-800 pb-2">
-            <Layers className="w-4 h-4 text-orange-400" />
-            <span>الصفحات ({pages.length})</span>
+        {/* Window 1: Pages Sidebar List (Scrollable) */}
+        <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col h-full min-h-0">
+          <div className="text-xs font-bold text-slate-400 flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+            <span className="flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-orange-400" />
+              الصفحات
+            </span>
+            <span className="bg-slate-800 text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
+              {pages.length}
+            </span>
           </div>
-          {pages.map((p, idx) => (
-            <button
-              key={p.id || idx}
-              onClick={() => setActivePageIndex(idx)}
-              className={`relative rounded-xl overflow-hidden border transition-all text-right p-1.5 flex flex-col gap-1.5 ${
-                activePageIndex === idx
-                  ? 'border-orange-500 bg-orange-500/10 shadow-md shadow-orange-500/10'
-                  : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'
-              }`}
-            >
-              <img src={p.imageUrl} alt={`Page ${idx + 1}`} className="w-full h-24 object-cover rounded-lg" />
-              <div className="flex justify-between items-center px-1">
-                <span className="text-[11px] font-bold text-slate-300">صفحة {idx + 1}</span>
-                <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">
-                  {p.bubbles?.length || 0} نص
-                </span>
-              </div>
-            </button>
-          ))}
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pl-1">
+            {pages.map((p, idx) => (
+              <button
+                key={p.id || idx}
+                onClick={() => setActivePageIndex(idx)}
+                className={`w-full relative rounded-xl overflow-hidden border transition-all text-right p-1.5 flex flex-col gap-1.5 ${
+                  activePageIndex === idx
+                    ? 'border-orange-500 bg-orange-500/10 shadow-md shadow-orange-500/10 ring-1 ring-orange-500/50'
+                    : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'
+                }`}
+              >
+                <img src={p.imageUrl} alt={`Page ${idx + 1}`} className="w-full h-28 object-cover rounded-lg" />
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[11px] font-bold text-slate-300">صفحة {idx + 1}</span>
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                    {p.bubbles?.length || 0} نص
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Dynamic Main Stage */}
-        <div className="col-span-10 flex gap-4 h-full min-h-0">
+        {/* Window 2 & 3 Container */}
+        <div className="col-span-10 flex gap-4 h-full min-h-0 overflow-hidden">
           {viewMode === 'editor' ? (
             <>
-              {/* Image Preview Container (Large View) */}
-              <div className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center justify-center overflow-hidden relative shadow-xl">
+              {/* Window 2: Image Preview Container (Scrollable) */}
+              <div className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center h-full min-h-0 overflow-y-auto custom-scrollbar relative shadow-xl">
                 <img
                   src={currentPage.imageUrl}
                   alt="Manga Page"
-                  className="max-h-full w-auto object-contain rounded-xl shadow-2xl border border-slate-800/80"
+                  className="max-h-none w-auto max-w-full object-contain rounded-xl shadow-2xl border border-slate-800/80 my-auto"
                 />
               </div>
 
-              {/* Text Translation Bubbles Editor Column */}
-              <div className="w-[450px] bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 overflow-y-auto shadow-xl">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-sm text-slate-200">محرر فقرات الصفحة ({currentPage.bubbles?.length || 0})</h3>
+              {/* Window 3: Text Translation Editor (Scrollable List) */}
+              <div className="w-[480px] bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-full min-h-0 shadow-xl">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-3">
+                  <h3 className="font-bold text-sm text-slate-200">
+                    محرر فقرات الصفحة ({currentPage.bubbles?.length || 0})
+                  </h3>
                 </div>
 
-                <div className="space-y-3">
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pl-1">
                   {currentPage.bubbles?.map((bubble: any, bIdx: number) => (
                     <div
                       key={bubble.id || bIdx}
@@ -166,12 +176,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                     >
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-mono font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded">
-                          #{bIdx + 1} [{bubble.category || 'dialogue'}]
+                          [{bubble.category || 'dialogue'}] #{bIdx + 1}
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono">Original</span>
                       </div>
 
-                      <div className="text-xs text-slate-400 font-mono bg-slate-900/80 p-2 rounded-lg border border-slate-800/60 leading-relaxed">
+                      <div className="text-xs text-slate-400 font-mono bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/60 leading-relaxed text-right" dir="auto">
                         {bubble.originalText}
                       </div>
 
@@ -179,7 +189,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                         value={bubble.translatedText}
                         onChange={(e) => onUpdateBubble(currentPage.id, bubble.id, e.target.value, bubble.category)}
                         rows={3}
-                        className="w-full p-2.5 text-xs border border-slate-700 rounded-lg bg-slate-900 text-slate-100 font-mono focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none resize-y leading-relaxed"
+                        className="w-full p-2.5 text-xs border border-slate-700 rounded-lg bg-slate-900 text-slate-100 font-mono focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none resize-y leading-relaxed custom-scrollbar"
                       />
                     </div>
                   ))}
@@ -188,9 +198,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </>
           ) : (
             /* Full Live Preview Mode */
-            <div className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex gap-8 overflow-y-auto shadow-xl">
+            <div className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex gap-8 h-full min-h-0 overflow-y-auto custom-scrollbar shadow-xl">
               <div className="flex-1 flex justify-center items-start bg-slate-950 rounded-xl p-4 border border-slate-800">
-                <img src={currentPage.imageUrl} alt="Preview" className="max-h-[80vh] w-auto object-contain rounded-lg shadow-2xl" />
+                <img src={currentPage.imageUrl} alt="Preview" className="w-auto max-w-full object-contain rounded-lg shadow-2xl" />
               </div>
               <div className="w-[500px] space-y-4">
                 <h3 className="font-bold text-base border-b border-slate-800 pb-3 text-orange-400">

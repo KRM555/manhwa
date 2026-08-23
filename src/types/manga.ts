@@ -1,21 +1,27 @@
 export interface DetectedBubble {
   id: string;
-  x: number; // percentage from left
-  y: number; // percentage from top
-  width: number;
-  height: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
   originalText: string;
   translatedText: string;
-  type: 'speech' | 'sfx' | 'thought' | 'narrator';
+  category: string;
+}
+
+export interface MangaPageItem {
+  id: string;
+  fileName: string;
+  previewUrl: string;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  error?: string;
+  items: DetectedBubble[];
 }
 
 export interface TranslationConfig {
   targetLanguage: string;
-  sourceLanguage: string;
   extractSFX: boolean;
   detectVerticalText: boolean;
-  fontStyle: 'wildwords' | 'comic' | 'manga-default' | 'anime-serif';
-  keepOriginalFontColor: boolean;
 }
 
 export interface SampleManga {

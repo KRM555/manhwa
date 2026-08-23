@@ -1,8 +1,5 @@
 import React from 'react';
 import { DetectedBubble } from '@/types/manga';
-import { CATEGORIES } from '@/utils/typerHelper';
-import { Card } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -13,169 +10,100 @@ import {
 
 interface TyperItemCardProps {
   item: DetectedBubble;
-  index: number;
-  isRTL: boolean;
-  onUpdate: (field: keyof DetectedBubble, val: string) => void;
+  onChange: (updatedText: string, category: string) => void;
 }
 
-export const TyperItemCard: React.FC<TyperItemCardProps> = ({
-  item,
-  index,
-  isRTL,
-  onUpdate,
-}) => {
+export const TyperItemCard: React.FC<TyperItemCardProps> = ({ item, onChange }) => {
+  // Determine Text Direction (RTL for Arabic, LTR for English/Other)
+  const isArabic = /[\u0600-\u06FF]/.test(item.translatedText);
+  const textDirection = isArabic ? 'rtl' : 'ltr';
+
+  const categories = [
+    { value: 'dialogue', label: 'حوار ""' },
+    { value: 'thought', label: 'أفكار ()' },
+    { value: 'scream', label: 'صراخ ::' },
+    { value: 'sfx', label: 'مؤثرات SFX:' },
+    { value: 'system', label: 'نظام []' },
+    { value: 'narrator', label: 'كلام خارجي OT:' },
+  ];
+
+  const handleCategoryChange = (newCategory: string) => {
+    // Strip existing prefixes
+    let cleanText = item.translatedText
+      .replace(/^::\s*/, '')
+      .replace(/^\(\)\s*/, '')
+      .replace(/^""\s*/, '')
+      .replace(/^SFX:\s*/, '')
+      .replace(/^OT:\s*/, '')
+      .replace(/^\[\]\s*/, '');
+
+    // Apply new prefix based on category
+    let prefix = '';
+    switch (newCategory) {
+      case 'scream':
+      case 'anger':
+        prefix = ':: ';
+        break;
+      case 'thought':
+        prefix = '() ';
+        break;
+      case 'dialogue':
+      case 'whisper':
+        prefix = '"" ';
+        break;
+      case 'sfx':
+        prefix = 'SFX: ';
+        break;
+      case 'system':
+      case 'phone':
+        prefix = '[] ';
+        break;
+      case 'narrator':
+      case 'other':
+        prefix = 'OT: ';
+        break;
+      default:
+        prefix = '"" ';
+    }
+
+    onChange(`${prefix}${cleanText}`, newCategory);
+  };
+
   return (
-    <Card className="p-4 space-y-3 rounded-2xl border-border bg-card shadow-sm">
-      <div className="flex justify-between items-center text-xs font-semibold">
-        <span className="text-muted-foreground font-bold">فقرة #{index + 1}</span>
-        <Select
-          value={item.category}
-          onValueChange={(val) => onUpdate('category', val)}
-        >
-          <SelectTrigger className="w-[180px] h-8 text-xs font-bold rounded-xl">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            {CATEGORIES.map((cat) => (
-              <SelectItem key={cat.value} value={cat.value} className="text-xs font-semibold">
-                {cat.label} ({cat.prefix})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-[11px] font-bold text-muted-foreground uppercase">
-          النص الأصلي (OCR):
-        </label>
-        <Textarea
-          value={item.originalText}
-          onChange={(e) => onUpdate('originalText', e.target.value)}
-          dir="ltr"
-          rows={2}
-          className="text-xs font-mono rounded-xl bg-muted/30 resize-none"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase">
-            النص المترجم مع كود التايبر:
-          </label>
-          <span className="text-[10px] text-muted-foreground font-mono"><dyad-write path="src/components/TyperItemCard.tsx" description="Component for editing a single detected bubble/dialogue item with category dropdown">
-import React from 'react';
-import { DetectedBubble } from '@/types/manga';
-import { CATEGORIES } from '@/utils/typerHelper';
-import { Card } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
-interface TyperItemCardProps {
-  item: DetectedBubble;
-  index: number;
-  isRTL: boolean;
-  onUpdate: (field: keyof DetectedBubble, val: string) => void;
-}
-
-export const TyperItemCard: React.FC<TyperItemCardProps> = ({
-  item,
-  index,
-  isRTL,
-  onUpdate,
-}) => {
-  return (
-    <Card className="p-4 space-y-3 rounded-2xl border-border bg-card shadow-sm">
-      <div className="flex justify-between items-center text-xs font-semibold">
-        <span className="text-muted-foreground font-bold">فقرة #{index + 1}</span>
-        <Select
-          value={item.category}
-          onValueChange={(val) => onUpdate('category', val)}
-        >
-          <SelectTrigger className="w-[180px] h-8 text-xs font-bold rounded-xl">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            {<dyad-write path="src/components/TyperItemCard.tsx" description="Single dialogue card editor with category selector">
-import React from 'react';
-import { DetectedBubble } from '@/types/manga';
-import { CATEGORIES } from '@/utils/typerHelper';
-import { Card } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-interface TyperItemCardProps {
-  item: DetectedBubble;
-  index: number;
-  isRTL: boolean;
-  onUpdate: (field: keyof DetectedBubble, val: string) => void;
-}
-
-export const TyperItemCard: React.FC<TyperItemCardProps> = ({
-  item,
-  index,
-  isRTL,
-  onUpdate,
-}) => {
-  return (
-    <Card className="p-4 space-y-3 rounded-2xl border-border bg-card shadow-sm">
-      <div className="flex justify-between items-center text-xs font-semibold">
-        <span className="text-muted-foreground font-bold">فقرة #{index + 1}</span>
-        <Select
-          value={item.category}
-          onValueChange={(val) => onUpdate('category', val)}
-        >
-          <SelectTrigger className="w-[180px] h-8 text-xs font-bold rounded-xl">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            {CATEGORIES.map((cat) => (
-              <SelectItem key={cat.value} value={cat.value} className="text-xs font-semibold">
-                {cat.label} ({cat.prefix})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-[11px] font-bold text-muted-foreground uppercase">
-          النص الأصلي (OCR):
-        </label>
-        <Textarea
-          value={item.originalText}
-          onChange={(e) => onUpdate('originalText', e.target.value)}
-          dir="ltr"
-          rows={2}
-          className="text-xs font-mono rounded-xl bg-muted/30 resize-none"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase">
-            النص المترجم مع كود التايبر:
-          </label>
-          <span className="text-[10px] text-muted-foreground font-mono">
-            {isRTL ? 'RTL' : 'LTR'}
-          </span>
+    <div className="p-4 border rounded-lg bg-card shadow-sm space-y-3">
+      {/* Category Selection Dropdown */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground font-mono">ID: #{item.id}</span>
+        <div className="w-40">
+          <Select value={item.category || 'dialogue'} onValueChange={handleCategoryChange}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="اختر التصنيف" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.value} value={cat.value} className="text-xs">
+                  {cat.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Textarea
-          value={item.translatedText}
-          onChange={(e) => onUpdate('translatedText', e.target.value)}
-          dir={isRTL ? 'rtl' : 'ltr'}
-          rows={2}
-          className={`text-sm font-semibold rounded-xl border-orange-500/30 focus-visible:ring-orange-500 ${
-            isRTL ? 'font-serif text-right' : 'font-sans text-left'
-          }`}
-        />
       </div>
-    </Card>
+
+      {/* Original Chinese/Japanese Text */}
+      {item.originalText && (
+        <div className="text-xs text-muted-foreground bg-muted p-2 rounded dir-ltr text-left font-mono">
+          {item.originalText}
+        </div>
+      )}
+
+      {/* Translated Text Area with Automatic Bidi Direction */}
+      <textarea
+        className="w-full p-2 text-sm border rounded-md bg-background resize-y min-h-[70px] focus:outline-none focus:ring-1 focus:ring-primary"
+        dir={textDirection}
+        value={item.translatedText}
+        onChange={(e) => onChange(e.target.value, item.category)}
+      />
+    </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { ResultsView } from '@/components/ResultsView';
 import { toast } from 'sonner';
-import { KeyRound, Image as ImageIcon, BookOpen, Settings2, Moon, Sun, Languages, Plus, Trash2, Save, X } from 'lucide-react';
+import { KeyRound, BookOpen, Settings2, Moon, Sun, Plus, Trash2, Save, X } from 'lucide-react';
 
 interface TyperRule {
   id: string;
@@ -38,7 +38,7 @@ export default function Index() {
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
-  // Dark Mode
+  // Dark Mode Toggle
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -77,7 +77,7 @@ export default function Index() {
 ${prefixRulesPrompt}
 
 Return STRICTLY a raw JSON array:
-[{"id": "1", "originalText": "text", "translatedText": "${typerRules[0]?.prefix || ''} translated", "category": "${typerRules[0]?.categoryKey || 'dialogue'"}]`;
+[{"id": "1", "originalText": "text", "translatedText": "${typerRules[0]?.prefix || ''} translated", "category": "${typerRules[0]?.categoryKey || 'dialogue'}"}]`;
 
       for (let i = 0; i < updatedPages.length; i++) {
         const page = updatedPages[i];
@@ -222,7 +222,7 @@ Return STRICTLY a raw JSON array:
                       targetLang === 'en' ? 'bg-orange-500 text-white' : 'bg-slate-50 dark:bg-slate-700'
                     }`}
                   >
-                    English (الإنجليزية)
+                    English (إنجليزية)
                   </button>
                 </div>
               </div>

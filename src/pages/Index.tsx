@@ -13,10 +13,10 @@ interface TyperRule {
 
 const DEFAULT_RULES: TyperRule[] = [
   { id: '1', name: 'حوار', prefix: '""', categoryKey: 'dialogue' },
-  { id: '2', name: 'أفكار', prefix: '()', categoryKey: 'thought' },
+  { id: '2', name: 'أفكار', prefix: '():', categoryKey: 'thought' },
   { id: '3', name: 'صراخ', prefix: '::', categoryKey: 'scream' },
   { id: '4', name: 'مؤثرات', prefix: 'SFX:', categoryKey: 'sfx' },
-  { id: '5', name: 'نظام', prefix: '[]', categoryKey: 'system' },
+  { id: '5', name: 'نظام', prefix: '[]:', categoryKey: 'system' },
   { id: '6', name: 'كلام خارجي', prefix: 'OT:', categoryKey: 'narrator' },
 ];
 
@@ -69,15 +69,25 @@ export default function Index() {
           ? 'Translate each text block into fluent English capturing tone and context.'
           : 'Translate each text block into fluent Arabic capturing tone and context.';
 
-      const promptText = `You are a professional Manhua/Manga translator assistant.
-1. Perform OCR on the image.
-2. ${targetLangInstruction}
-3. Categorize each text block into: ${categoriesList}
-4. Place symbol at VERY BEGINNING of "translatedText":
-${prefixRulesPrompt}
+      const promptText = `You are a professional Manhua/Manga/Manhwa translator and typesetter assistant.
 
-Return STRICTLY a raw JSON array:
-[{"id": "1", "originalText": "text", "translatedText": "${typerRules[0]?.prefix || ''} translated", "category": "${typerRules[0]?.categoryKey || 'dialogue'}"}]`;
+1. Perform OCR to extract all visible text.
+2. ${targetLangInstruction}
+3. Categorize each text block into ONE of these categories: ${categoriesList}
+
+4. CRITICAL FORMATTING RULE FOR TYPERTOOL:
+   You MUST prepend the exact Category Prefix strictly at the VERY BEGINNING of the "translatedText" string.
+   Do NOT wrap the text or add closing brackets/tags at the end. Only place the prefix at the start.
+
+Examples of correct format:
+- System category (prefix "[]:"): "[]: عدد نقاطك 10452 نقطة أتريد الشراء؟"
+- Thought category (prefix "():"): "(): هل هذا هو الوحش الذي يلتهم الجميع؟"
+- Scream category (prefix "::"): ":: غواااااا!"
+- SFX category (prefix "SFX:"): "SFX: خطوات ثقيلة"
+- Dialogue category (prefix '""'): '""ما هذا؟ هل هو وحش؟'
+
+Return STRICTLY a raw JSON array of objects:
+[{"id": "1", "originalText": "text", "translatedText": "[]: عدد نقاطك 10452", "category": "system"}]`;
 
       for (let i = 0; i < updatedPages.length; i++) {
         const page = updatedPages[i];

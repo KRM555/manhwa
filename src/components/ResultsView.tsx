@@ -30,9 +30,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'editor' | 'preview'>('editor');
   const [copied, setCopied] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>('ALL');
   const currentPage = pages[activePageIndex];
 
-  // جلب البادئة/التصنيف المخصص من الإعدادات
   const getCategoryTag = (categoryKey: string) => {
     if (!categories || categories.length === 0) {
       if (categoryKey === 'sfx') return 'SFX:';
@@ -48,11 +48,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
         c.value?.toLowerCase() === categoryKey.toLowerCase()
     );
 
-    if (found) {
-      return found.prefix || found.tag || found.name || categoryKey;
-    }
-
-    return '::""';
+    return found ? (found.prefix || found.tag || found.name || categoryKey) : '::""';
   };
 
   const formatBubbleText = (bubble: any) => {
@@ -90,6 +86,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   };
 
   if (!currentPage) return null;
+
+  const filteredBubbles = currentPage.bubbles?.filter((b: any) => {
+    if (activeFilter === 'ALL') return true;
+    return (b.category || 'dialogue').toUpperCase() === activeFilter;
+  });
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-100px)] gap-4">
@@ -147,10 +148,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
         </div>
       </div>
 
-      {/* النوافذ الثلاث بعناصر سكرول طبيعية */}
+      {/* النوافذ الثلاث مع السكرول البرتقالي المخصص */}
       <div className="flex-1 grid grid-cols-12 gap-4 h-full min-h-0 overflow-hidden">
         
-        {/* النافذة الأولى: سكرول الصفحات */}
+        {/* النافذة الأولى: سكرول الصفحات الجانبي البرتقالي */}
         <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col h-full min-h-0">
           <div className="border-b border-slate-800 pb-2 mb-3">
             <div className="text-xs font-bold text-slate-400 flex items-center justify-between">
@@ -164,7 +165,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pl-1">
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pl-1 pr-1">
             {pages.map((p, idx) => (
               <button
                 key={p.id || idx}
@@ -178,7 +179,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 <img
                   src={p.imageUrl}
                   alt={`Page ${idx + 1}`}
-                  className="w-full h-28 object-cover rounded-lg transition-all"
+                  className="w-full h-32 object-cover rounded-lg transition-all"
                 />
                 <div className="flex justify-between items-center px-1">
                   <span className="text-[11px] font-bold text-slate-300">صفحة {idx + 1}</span>
@@ -191,11 +192,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
         </div>
 
-        {/* باقي النوافذ */}
+        {/* بقية النوافذ */}
         <div className="col-span-10 flex gap-4 h-full min-h-0 overflow-hidden">
           {viewMode === 'editor' ? (
             <>
-              {/* النافذة الثانية: سكرول عرض الصورة الطبيعي */}
+              {/* النافذة الثانية: معاينة الصورة */}
               <div className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-full min-h-0 shadow-xl">
                 <div className="border-b border-slate-800 pb-2 mb-3">
                   <span className="text-xs font-bold text-slate-300">معاينة الصورة</span>
@@ -210,16 +211,35 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 </div>
               </div>
 
-              {/* النافذة الثالثة: سكرول محرر النصوص */}
+              {/* النافذة الثالثة: المحرر مع سكرول أفقية للفلاتر وسكرول رأسي للنصوص */}
               <div className="w-[480px] bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col h-full min-h-0 shadow-xl">
-                <div className="border-b border-slate-800 pb-3 mb-3">
+                
+                {/* شريط الفلاتر الأفقي بسكرول برتقالي رفيع */}
+                <div className="border-b border-slate-800 pb-3 mb-3 space-y-2">
                   <h3 className="font-bold text-sm text-slate-200">
-                    محرر الفقرات ({currentPage.bubbles?.length || 0})
+                    TEXT BLOCKS ({currentPage.bubbles?.length || 0})
                   </h3>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1.5">
+                    {['ALL', 'DIALOGUE', 'SFX', 'THOUGHT', 'SYSTEM'].map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => setActiveFilter(filter)}
+                        className={`text-[10px] font-mono px-2.5 py-1 rounded-md transition-all whitespace-nowrap ${
+                          activeFilter === filter
+                            ? 'bg-orange-500 text-white font-bold'
+                            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                        }`}
+                      >
+                        {filter}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pl-1">
-                  {currentPage.bubbles?.map((bubble: any, bIdx: number) => (
+                {/* قائمة النصوص بالسكرول الرأسي البرتقالي */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pl-1 pr-1">
+                  {filteredBubbles?.map((bubble: any, bIdx: number) => (
                     <div
                       key={bubble.id || bIdx}
                       className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2 shadow-inner hover:border-slate-700 transition-all"
@@ -227,7 +247,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-mono text-slate-500 font-bold">#{bIdx + 1}</span>
 
-                        {/* قائمة الفئات القارئة للإعدادات */}
                         <select
                           value={bubble.category || 'dialogue'}
                           onChange={(e) =>
@@ -257,12 +276,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                         </select>
                       </div>
 
-                      {/* النص الأصلي */}
                       <div className="text-xs text-slate-400 font-mono bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/60 leading-relaxed text-left" dir="ltr">
                         {bubble.originalText}
                       </div>
 
-                      {/* حقل التعديل بالاتجاه التلقائي */}
                       <textarea
                         value={bubble.translatedText}
                         onChange={(e) => onUpdateBubble(currentPage.id, bubble.id, e.target.value, bubble.category)}

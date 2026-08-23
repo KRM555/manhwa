@@ -15,13 +15,13 @@ export default function Index() {
   );
 
   const handleProcessPages = async (uploadedPages: MangaPageItem[]) => {
-    if (!apiKey) {
+    if (!apiKey.trim()) {
       toast.error('يرجى إدخال مفتاح Gemini API أولاً');
       return;
     }
 
     setIsAnalyzing(true);
-    localStorage.setItem('gemini_api_key', apiKey);
+    localStorage.setItem('gemini_api_key', apiKey.trim());
     setPages(uploadedPages);
 
     try {
@@ -58,26 +58,26 @@ Return STRICTLY a raw JSON array of objects without markdown headers like this:
   }
 ]`;
 
-       const response = await fetch(
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
-  {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey.trim()
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { text: promptText },
-            { inline_data: { mime_type: mimeType, data: base64Data } },
-          ],
-        },
-      ],
-    }),
-  }
-);
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
+          {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey.trim()
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: promptText },
+                    { inline_data: { mime_type: mimeType, data: base64Data } },
+                  ],
+                },
+              ],
+            }),
+          }
+        );
 
         const data = await response.json();
         if (data.error) throw new Error(data.error.message || 'API Error');
@@ -128,7 +128,6 @@ Return STRICTLY a raw JSON array of objects without markdown headers like this:
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 flex flex-col justify-center py-12 px-4" dir="rtl">
       {view === 'upload' ? (
         <div className="mx-auto w-full max-w-xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
-          {/* Header section */}
           <div className="text-center space-y-2">
             <div className="inline-flex items-center justify-center p-3 bg-orange-100 dark:bg-orange-950/50 text-orange-600 rounded-2xl mb-1">
               <Sparkles className="w-6 h-6" />
@@ -141,7 +140,6 @@ Return STRICTLY a raw JSON array of objects without markdown headers like this:
             </p>
           </div>
 
-          {/* API Key Box */}
           <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 p-4 rounded-xl space-y-2">
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-orange-500" />
@@ -156,7 +154,6 @@ Return STRICTLY a raw JSON array of objects without markdown headers like this:
             />
           </div>
 
-          {/* Upload Zone Component */}
           <UploadZone onStartProcessing={handleProcessPages} isAnalyzing={isAnalyzing} />
         </div>
       ) : (

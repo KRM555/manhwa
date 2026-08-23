@@ -1,8 +1,19 @@
 import { MangaPageItem } from '@/types/manga';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
-import { saveAs } from 'file-saver';
 
-// 1. Helper to format full script for Photoshop Typer syntax
+// 1. Helper function to download blobs natively without external packages
+const downloadBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+// 2. Helper to format full script for Photoshop Typer syntax
 export const generateTyperScript = (pages: MangaPageItem[]): string => {
   let script = '';
 
@@ -17,14 +28,14 @@ export const generateTyperScript = (pages: MangaPageItem[]): string => {
   return script;
 };
 
-// 2. Export to Text (.txt)
+// 3. Export to Text (.txt)
 export const exportToTxt = (pages: MangaPageItem[]) => {
   const content = generateTyperScript(pages);
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  saveAs(blob, `Manga_Translation_Typer_${Date.now()}.txt`);
+  downloadBlob(blob, `Manga_Translation_Typer_${Date.now()}.txt`);
 };
 
-// 3. Export to Word (.docx)
+// 4. Export to Word (.docx)
 export const exportToWord = async (pages: MangaPageItem[]) => {
   const docChildren: Paragraph[] = [];
 
@@ -68,5 +79,5 @@ export const exportToWord = async (pages: MangaPageItem[]) => {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `Manga_Translation_${Date.now()}.docx`);
+  downloadBlob(blob, `Manga_Translation_${Date.now()}.docx`);
 };

@@ -23,10 +23,14 @@ export async function extractTextWithGemini(
     ? `You are an OCR tool for manga/comics. Extract all text elements in reading order. Return ONLY a valid JSON array of objects without markdown formatting: [{"originalText": "text", "translatedText": "text", "category": "dialogue"}]`
     : `You are a manga translation tool. Extract and translate all text elements into ${targetLang === 'ar' ? 'Arabic' : 'English'}. Return ONLY a valid JSON array of objects without markdown formatting: [{"originalText": "text", "translatedText": "translated text", "category": "dialogue"}]`;
 
-  const cleanKey = apiKey.trim();
-  
-  // استخدام موديل Gemini الفائق والأحدث للمعالجة والرؤية
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`;
+  const cleanKey = apiKey ? apiKey.trim() : '';
+
+  if (!cleanKey) {
+    throw new Error("يرجى إدخال API Key الخاص بـ Gemini أولاً من الإعدادات");
+  }
+
+  // الموديل الرسمي المستقر لـ REST API (gemini-1.5-flash)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -54,11 +58,7 @@ export async function extractTextWithGemini(
 
   if (!response.ok) {
     const errorRes = await response.json().catch(() => ({}));
-    const errorMsg = errorRes.error?.message || `فشل الاتصال (${response.status})`;
-    
-    if (response.status === 404) {
-      throw new Error("تأكد من استخدام API Key صحيح يبدأ بـ AIzaSy... من Google AI Studio");
-    }
+    const errorMsg = errorRes.error?.message || `فشل الاتصال بـ API (${response.status})`;
     throw new Error(errorMsg);
   }
 

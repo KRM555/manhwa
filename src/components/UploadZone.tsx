@@ -30,7 +30,7 @@ export async function extractTextWithGemini(
   }
 
   // الموديل الرسمي المستقر لـ REST API (gemini-1.5-flash)
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`;
+ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${cleanKey}`;
 
   const response = await fetch(url, {
     method: 'POST',

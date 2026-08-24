@@ -4,7 +4,8 @@ import { TranslationConfig } from '@/types/manga';
 import { 
   ArrowLeft, Download, Sparkles, Key, RefreshCw, 
   Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2,
-  ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown
+  ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
+  Copy, Check, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -72,7 +73,6 @@ const UI_TEXT = {
     reAnalyze: 'إعادة التحليل',
     analyzeAll: 'تحليل كافة الصور',
     extractOcrOnly: 'استخراج النص فقط (OCR)',
-    saveDraft: 'حفظ المسودة',
     exportOriginal: 'تصدير النص الأصلي (OCR)',
     exportTranslated: 'تصدير النص المترجم',
     exportCurrentPage: 'الصفحة الحالية فقط',
@@ -98,6 +98,16 @@ const UI_TEXT = {
     tagSuffix: 'اللاحقة (Suffix)',
     add: 'إضافة',
     deleteTag: 'حذف العلامة',
+    resetDefaultTags: 'استعادة العلامات الافتراضية',
+    newProject: 'مشروع جديد',
+    copyBlock: 'نسخ الفقرة',
+    copyAllPage: 'نسخ نصوص الصفحة',
+    copied: 'تم النسخ!',
+    findReplace: 'البحث والاستبدال',
+    findPlaceholder: 'بحث عن كلمة...',
+    replacePlaceholder: 'استبدال بـ...',
+    replaceCurrentPage: 'في هذه الصفحة',
+    replaceAllPages: 'في كل الصفحات',
   },
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
@@ -108,7 +118,6 @@ const UI_TEXT = {
     reAnalyze: 'Re-analyze',
     analyzeAll: 'Analyze All Images',
     extractOcrOnly: 'Extract Text Only (OCR)',
-    saveDraft: 'Save Draft',
     exportOriginal: 'Export Original (OCR)',
     exportTranslated: 'Export Translated',
     exportCurrentPage: 'Current Page Only',
@@ -134,11 +143,24 @@ const UI_TEXT = {
     tagSuffix: 'Suffix',
     add: 'Add Tag',
     deleteTag: 'Delete Tag',
+    resetDefaultTags: 'Reset Default Tags',
+    newProject: 'New Project',
+    copyBlock: 'Copy Block',
+    copyAllPage: 'Copy Page Texts',
+    copied: 'Copied!',
+    findReplace: 'Find & Replace',
+    findPlaceholder: 'Find text...',
+    replacePlaceholder: 'Replace with...',
+    replaceCurrentPage: 'Current Page',
+    replaceAllPages: 'All Pages',
   },
 };
 
 export default function Index() {
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [images, setImages] = useState<ImageItem[]>(() => {
+    const saved = localStorage.getItem('manga_studio_images');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -156,7 +178,10 @@ export default function Index() {
     detectVerticalText: true,
   });
 
-  const [resultsMap, setResultsMap] = useState<Record<string, ExtractedText[]>>({});
+  const [resultsMap, setResultsMap] = useState<Record<string, ExtractedText[]>>(() => {
+    const saved = localStorage.getItem('manga_studio_results');
+    return saved ? JSON.parse(saved) : {};
+  });
 
   const [tags, setTags] = useState<TagRule[]>(() => {
     const saved = localStorage.getItem('custom_manga_tags');
@@ -167,9 +192,33 @@ export default function Index() {
   const [newTagPrefix, setNewTagPrefix] = useState('');
   const [newTagSuffix, setNewTagSuffix] = useState('');
 
+  // حالة البحث والاستبدال
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+
+  // حالة التمييز البصري
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
+  // حفظ كاش العمل التلقائي
   useEffect(() => {
     localStorage.setItem('custom_manga_tags', JSON.stringify(tags));
   }, [tags]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('manga_studio_results', JSON.stringify(resultsMap));
+    } catch (e) {
+      console.warn('Storage quota limit reached for results map');
+    }
+  }, [resultsMap]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('manga_studio_images', JSON.stringify(images));
+    } catch (e) {
+      console.warn('Storage quota limit reached for images');
+    }
+  }, [images]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -223,6 +272,9 @@ export default function Index() {
     setImages([]);
     setActiveImageIndex(0);
     setResultsMap({});
+    localStorage.removeItem('manga_studio_results');
+    localStorage.removeItem('manga_studio_images');
+    toast.success(lang === 'ar' ? 'تم بدء مشروع جديد' : 'New project started');
   };
 
   const handleSaveApiKey = (key: string) => {
@@ -246,7 +298,6 @@ export default function Index() {
     toast.success(lang === 'ar' ? 'تمت إضافة العلامة الجديدة!' : 'Custom tag added!');
   };
 
-  // دالة حذف العلامات
   const handleDeleteTag = (index: number) => {
     if (tags.length <= 1) {
       toast.error(lang === 'ar' ? 'يجب الإبقاء على علامة واحدة على الأقل' : 'At least one tag must remain');
@@ -257,11 +308,82 @@ export default function Index() {
     toast.success(lang === 'ar' ? 'تم حذف العلامة بنجاح' : 'Tag deleted successfully');
   };
 
+  const handleResetDefaultTags = () => {
+    setTags(DEFAULT_TAGS);
+    toast.success(lang === 'ar' ? 'تمت استعادة العلامات الافتراضية' : 'Reset to default tags');
+  };
+
   const formatTextWithRules = (text: string, categoryVal: string): string => {
     const cleanText = text.trim();
     const rule = tags.find((t) => t.value === categoryVal);
     if (!rule) return cleanText;
     return `${rule.prefix}${cleanText}${rule.suffix}`;
+  };
+
+  // دالة نقل العناصر لأعلى/أسفل
+  const handleMoveItem = (index: number, direction: 'up' | 'down') => {
+    if (!activeImage) return;
+    const items = [...currentItems];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+
+    const temp = items[index];
+    items[index] = items[targetIndex];
+    items[targetIndex] = temp;
+
+    setResultsMap((prev) => ({ ...prev, [activeImage.id]: items }));
+  };
+
+  // دالة النسخ السريع
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(t.copied);
+  };
+
+  const handleCopyPageFormatted = () => {
+    if (currentItems.length === 0) return;
+    const fullText = currentItems
+      .map((item) => formatTextWithRules(item.translatedText, item.category))
+      .join('\n\n');
+    navigator.clipboard.writeText(fullText);
+    toast.success(t.copied);
+  };
+
+  // دالة البحث والاستبدال
+  const handleFindAndReplace = (scope: 'current' | 'all') => {
+    if (!findText.trim()) return;
+
+    let totalReplacements = 0;
+    const newMap = { ...resultsMap };
+
+    const processList = (list: ExtractedText[]) => {
+      return list.map((item) => {
+        let updatedTranslated = item.translatedText;
+        if (updatedTranslated.includes(findText)) {
+          const count = updatedTranslated.split(findText).length - 1;
+          totalReplacements += count;
+          updatedTranslated = updatedTranslated.replaceAll(findText, replaceText);
+        }
+        return { ...item, translatedText: updatedTranslated };
+      });
+    };
+
+    if (scope === 'current' && activeImage) {
+      if (newMap[activeImage.id]) {
+        newMap[activeImage.id] = processList(newMap[activeImage.id]);
+      }
+    } else {
+      Object.keys(newMap).forEach((imgId) => {
+        newMap[imgId] = processList(newMap[imgId]);
+      });
+    }
+
+    setResultsMap(newMap);
+    toast.success(
+      lang === 'ar'
+        ? `تم استبدال الكلمة ${totalReplacements} مرة!`
+        : `Replaced ${totalReplacements} occurrences!`
+    );
   };
 
   const processGeminiRequest = async (targetImg: ImageItem, ocrOnly = false): Promise<ExtractedText[] | null> => {
@@ -454,7 +576,6 @@ export default function Index() {
       {/* Header */}
       <header className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
-          {/* اسم الموقع الثابت */}
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
             Manhwa Transtool Studio
           </h1>
@@ -462,6 +583,17 @@ export default function Index() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* زر مشروع جديد */}
+          <Button
+            variant="outline"
+            onClick={handleClearAllImages}
+            className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+          >
+            <FolderPlus className="w-4 h-4 text-orange-500" />
+            {t.newProject}
+          </Button>
+
+          {/* إعدادات العلامات */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl">
@@ -471,7 +603,18 @@ export default function Index() {
             </DialogTrigger>
             <DialogContent className="max-w-md rounded-2xl">
               <DialogHeader>
-                <DialogTitle className="text-base font-bold">{t.tagSettings}</DialogTitle>
+                <DialogTitle className="text-base font-bold flex items-center justify-between">
+                  <span>{t.tagSettings}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetDefaultTags}
+                    className="text-xs text-muted-foreground hover:text-orange-500 gap-1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {t.resetDefaultTags}
+                  </Button>
+                </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
@@ -498,7 +641,6 @@ export default function Index() {
                         className="h-7 text-xs w-16"
                         placeholder="Suffix"
                       />
-                      {/* زر حذف العلامة */}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -679,6 +821,44 @@ export default function Index() {
               <ArrowLeft className="w-4 h-4" /> {t.backToUpload}
             </Button>
 
+            {/* شريط البحث والاستبدال المدمج */}
+            <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl border border-border/60">
+              <div className="flex items-center gap-1.5 px-2">
+                <Search className="w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder={t.findPlaceholder}
+                  value={findText}
+                  onChange={(e) => setFindText(e.target.value)}
+                  className="h-7 text-xs w-28 bg-background"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 px-1">
+                <Replace className="w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder={t.replacePlaceholder}
+                  value={replaceText}
+                  onChange={(e) => setReplaceText(e.target.value)}
+                  className="h-7 text-xs w-28 bg-background"
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => handleFindAndReplace('current')}
+                className="h-7 text-[11px] font-bold px-2 rounded-lg"
+              >
+                {t.replaceCurrentPage}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleFindAndReplace('all')}
+                className="h-7 text-[11px] font-bold px-2 rounded-lg"
+              >
+                {t.replaceAllPages}
+              </Button>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="ghost"
@@ -784,7 +964,7 @@ export default function Index() {
                   <img
                     src={activeImage.url}
                     alt="Manga Page"
-                    className="w-full max-w-[550px] h-auto object-contain rounded-lg shadow-md"
+                    className="w-full max-w-[550px] h-auto object-contain rounded-lg shadow-md transition-transform"
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground m-auto">{t.noImage}</p>
@@ -799,29 +979,87 @@ export default function Index() {
                   <Sparkles className="w-4 h-4 text-orange-500" />
                   {t.extractedTexts} ({currentItems.length})
                 </h3>
+                {/* زر نسخ كافة النصوص للصفحة الحالية */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyPageFormatted}
+                  className="h-8 text-xs font-bold gap-1.5 rounded-lg border-orange-500/30 text-orange-600 dark:text-orange-400"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {t.copyAllPage}
+                </Button>
               </div>
 
               {currentItems.map((item, idx) => (
-                <Card key={item.id} className="p-4 space-y-3 border-border rounded-xl shadow-sm hover:border-orange-500/30 transition-colors">
+                <Card
+                  key={item.id}
+                  onMouseEnter={() => setHoveredItemId(item.id)}
+                  onMouseLeave={() => setHoveredItemId(null)}
+                  className={`p-4 space-y-3 border-border rounded-xl shadow-sm transition-all ${
+                    hoveredItemId === item.id
+                      ? 'border-orange-500 ring-1 ring-orange-500/40 bg-orange-500/5'
+                      : 'hover:border-orange-500/30'
+                  }`}
+                >
                   <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
-                    <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
-                      {t.paragraph} #{idx + 1}
-                    </span>
-                    <Select
-                      value={item.category}
-                      onValueChange={(val) => updateItem(item.id, 'category', val)}
-                    >
-                      <SelectTrigger className="w-[180px] h-8 text-xs font-bold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tags.map((tag) => (
-                          <SelectItem key={tag.value} value={tag.value}>
-                            {tag.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
+                        {t.paragraph} #{idx + 1}
+                      </span>
+                      {/* أزرار تقديم وتأخير الترتيب */}
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={idx === 0}
+                          onClick={() => handleMoveItem(idx, 'up')}
+                          className="h-6 w-6 rounded-md"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={idx === currentItems.length - 1}
+                          onClick={() => handleMoveItem(idx, 'down')}
+                          className="h-6 w-6 rounded-md"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* زر نسخ هذه الفقرة */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          handleCopyText(formatTextWithRules(item.translatedText, item.category))
+                        }
+                        className="h-7 px-2 text-[11px] gap-1 font-bold text-muted-foreground hover:text-orange-500"
+                      >
+                        <Copy className="w-3 h-3" />
+                        {t.copyBlock}
+                      </Button>
+
+                      <Select
+                        value={item.category}
+                        onValueChange={(val) => updateItem(item.id, 'category', val)}
+                      >
+                        <SelectTrigger className="w-[170px] h-8 text-xs font-bold">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tags.map((tag) => (
+                            <SelectItem key={tag.value} value={tag.value}>
+                              {tag.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="space-y-1">

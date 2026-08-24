@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
-import { TranslationConfig, SampleManga } from '@/types/manga';
+import { TranslationConfig } from '@/types/manga';
 import { 
-  ArrowLeft, Download, Save, Sparkles, Key, RefreshCw, 
+  ArrowLeft, Download, Sparkles, Key, RefreshCw, 
   Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2,
-  ExternalLink, FileText, Plus, Settings2, Play
+  ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown, Edit2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
 export interface ExtractedText {
@@ -56,7 +64,6 @@ const CANDIDATE_MODELS = [
 
 const UI_TEXT = {
   ar: {
-    title: 'Manga Translator Studio',
     subtitle: 'أداة استخراج وترجمة وتنسيق سكريبتات الويب تون والمانجا',
     apiLabel: 'مفتاح Gemini API:',
     apiHint: 'احصل على مفتاح مجاني من Google AI Studio',
@@ -66,7 +73,10 @@ const UI_TEXT = {
     analyzeAll: 'تحليل كافة الصور',
     extractOcrOnly: 'استخراج النص فقط (OCR)',
     saveDraft: 'حفظ المسودة',
-    exportTxt: 'تصدير TXT المنسق',
+    exportOriginal: 'تصدير النص الأصلي (OCR)',
+    exportTranslated: 'تصدير النص المترجم',
+    exportCurrentPage: 'الصفحة الحالية فقط',
+    exportAllPages: 'كافة الصفحات',
     pagePreview: 'معاينة الصفحة',
     extractedTexts: 'النصوص المستخرجة',
     originalText: 'النص الأصلي:',
@@ -79,7 +89,7 @@ const UI_TEXT = {
     enterApiKey: 'يرجى إدخال مفتاح Gemini API Key أولاً',
     analyzing: 'جاري معالجة واستخراج النصوص بواسطة Gemini...',
     successExtract: 'تم استخراج النصوص بنجاح!',
-    noItemsToExport: 'لا توجد نصوص لتصديرها',
+    noItemsToExport: 'لا توجد نصوص لتصديرها لهذه الصفحة',
     clearAll: 'حذف الكل',
     tagSettings: 'إعدادات العلامات والتنسيق',
     addNewTag: 'إضافة علامة جديدة',
@@ -87,9 +97,9 @@ const UI_TEXT = {
     tagPrefix: 'البادئة (Prefix)',
     tagSuffix: 'اللاحقة (Suffix)',
     add: 'إضافة',
+    editSiteTitle: 'تعديل اسم الموقع / الفصل',
   },
   en: {
-    title: 'Manga Translator Studio',
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
     apiLabel: 'Gemini API Key:',
     apiHint: 'Get free key from Google AI Studio',
@@ -99,7 +109,10 @@ const UI_TEXT = {
     analyzeAll: 'Analyze All Images',
     extractOcrOnly: 'Extract Text Only (OCR)',
     saveDraft: 'Save Draft',
-    exportTxt: 'Export Formatted TXT',
+    exportOriginal: 'Export Original (OCR)',
+    exportTranslated: 'Export Translated',
+    exportCurrentPage: 'Current Page Only',
+    exportAllPages: 'All Pages',
     pagePreview: 'Page Preview',
     extractedTexts: 'Extracted Texts',
     originalText: 'Original Text:',
@@ -112,7 +125,7 @@ const UI_TEXT = {
     enterApiKey: 'Please enter a valid Gemini API Key first',
     analyzing: 'Processing text with Gemini...',
     successExtract: 'Texts successfully extracted!',
-    noItemsToExport: 'No texts available for export',
+    noItemsToExport: 'No texts available to export',
     clearAll: 'Clear All',
     tagSettings: 'Tag Formatting Settings',
     addNewTag: 'Add Custom Tag',
@@ -120,10 +133,17 @@ const UI_TEXT = {
     tagPrefix: 'Prefix',
     tagSuffix: 'Suffix',
     add: 'Add Tag',
+    editSiteTitle: 'Edit Site/Chapter Title',
   },
 };
 
 export default function Index() {
+  // اسم الموقع القابل للتعديل والتأثير في الملف المصدّر
+  const [siteTitle, setSiteTitle] = useState<string>(() => {
+    return localStorage.getItem('custom_site_title') || 'Manhwa Transtool Studio';
+  });
+  const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
+
   const [images, setImages] = useState<ImageItem[]>([]);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
@@ -142,10 +162,8 @@ export default function Index() {
     detectVerticalText: true,
   });
 
-  // نتائج النصوص مقسمة بـ ID كل صورة
   const [resultsMap, setResultsMap] = useState<Record<string, ExtractedText[]>>({});
-  
-  // نظام العلامات المخصصة والتنسيقات
+
   const [tags, setTags] = useState<TagRule[]>(() => {
     const saved = localStorage.getItem('custom_manga_tags');
     return saved ? JSON.parse(saved) : DEFAULT_TAGS;
@@ -158,6 +176,10 @@ export default function Index() {
   useEffect(() => {
     localStorage.setItem('custom_manga_tags', JSON.stringify(tags));
   }, [tags]);
+
+  useEffect(() => {
+    localStorage.setItem('custom_site_title', siteTitle);
+  }, [siteTitle]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -241,7 +263,6 @@ export default function Index() {
     return `${rule.prefix}${cleanText}${rule.suffix}`;
   };
 
-  // وظيفة التحليل لاستخراج الصورة المحددة أو الكل
   const processGeminiRequest = async (targetImg: ImageItem, ocrOnly = false): Promise<ExtractedText[] | null> => {
     const mimeTypeMatch = targetImg.url.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
@@ -364,17 +385,21 @@ export default function Index() {
     setView('results');
   };
 
-  const handleExport = () => {
-    if (images.length === 0) return;
+  // دوال التصدير المطلوبة مع أسماء الملفات المحددة
+  const handleExportText = (scope: 'current' | 'all', textType: 'original' | 'translated') => {
+    const targetImages = scope === 'current' ? (activeImage ? [activeImage] : []) : images;
+    if (targetImages.length === 0) return;
 
     let fullOutput = '';
 
-    images.forEach((img, idx) => {
+    targetImages.forEach((img) => {
+      const realIndex = images.findIndex((i) => i.id === img.id);
       const itemsForImg = resultsMap[img.id] || [];
       if (itemsForImg.length > 0) {
-        fullOutput += `=== Page ${idx + 1}: ${img.name} ===\n\n`;
+        fullOutput += `=== Page ${realIndex + 1}: ${img.name} ===\n\n`;
         itemsForImg.forEach((item) => {
-          fullOutput += formatTextWithRules(item.translatedText, item.category) + '\n\n';
+          const contentToExport = textType === 'original' ? item.originalText : item.translatedText;
+          fullOutput += formatTextWithRules(contentToExport, item.category) + '\n\n';
         });
         fullOutput += '\n';
       }
@@ -389,13 +414,31 @@ export default function Index() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `manga_translated_script.txt`;
+    
+    // بناء اسم الملف بناءً على طلبك المحدد
+    let fileName = '';
+    if (textType === 'original') {
+      fileName = scope === 'current' 
+        ? `page_${activeImageIndex + 1}_ocr_original_script.txt` 
+        : `full_ocr_original_script.txt`;
+    } else {
+      fileName = scope === 'current' 
+        ? `page_${activeImageIndex + 1}_translated_script.txt` 
+        : `full_translated_script.txt`;
+    }
+    
+    link.download = fileName;
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success(lang === 'ar' ? 'تم تصدير ملف النصوص بنجاح!' : 'Export successful!');
+    toast.success(
+      lang === 'ar'
+        ? `تم تصدير (${fileName}) بنجاح!`
+        : `Exported (${fileName}) successfully!`
+    );
   };
 
   const updateItem = (id: string, field: keyof ExtractedText, value: string) => {
@@ -412,14 +455,32 @@ export default function Index() {
       {/* Header */}
       <header className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
-            {t.title}
-          </h1>
+          {/* عنوان الموقع القابل للتعديل عند الضغط عليه أو زر التعديل */}
+          <div className="flex items-center gap-2">
+            {isEditingTitle ? (
+              <Input
+                value={siteTitle}
+                onChange={(e) => setSiteTitle(e.target.value)}
+                onBlur={() => setIsEditingTitle(false)}
+                onKeyDown={(e) => e.key === 'Enter' && setIsEditingTitle(false)}
+                autoFocus
+                className="text-xl font-extrabold h-9 w-72 text-orange-600 dark:text-orange-500 rounded-lg"
+              />
+            ) : (
+              <h1
+                onClick={() => setIsEditingTitle(true)}
+                title={t.editSiteTitle}
+                className="text-2xl sm:text-3xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500 cursor-pointer flex items-center gap-2 hover:opacity-90 transition-opacity"
+              >
+                {siteTitle}
+                <Edit2 className="w-4 h-4 text-muted-foreground hover:text-orange-500 transition-colors" />
+              </h1>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">{t.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          {/* Custom Tag Settings Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl">
@@ -508,7 +569,6 @@ export default function Index() {
             {lang === 'ar' ? 'English' : 'عربي'}
           </Button>
 
-          {/* API Key Box */}
           <div className="flex flex-col gap-1 w-full sm:w-auto">
             <div className="flex items-center gap-1.5">
               <Key className="w-3.5 h-3.5 text-orange-500 shrink-0" />
@@ -534,7 +594,7 @@ export default function Index() {
         </div>
       </header>
 
-      {/* Multi-Image Bar */}
+      {/* Multi-Image Navigation Bar */}
       {images.length > 0 && (
         <div className="mb-6 p-3 bg-card border border-border rounded-2xl flex items-center justify-between gap-3 overflow-x-auto shadow-sm">
           <div className="flex items-center gap-2">
@@ -656,9 +716,47 @@ export default function Index() {
                 <Play className="w-3.5 h-3.5" /> {t.analyzeAll}
               </Button>
 
-              <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold rounded-xl">
-                <Download className="w-4 h-4" /> {t.exportTxt}
-              </Button>
+              {/* قائمة تصدير النص الأصلي فقط (OCR) */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 gap-1.5 text-xs font-bold rounded-xl">
+                    <FileDown className="w-4 h-4" />
+                    {t.exportOriginal}
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-xl">
+                  <DropdownMenuLabel className="text-xs font-bold">{t.exportOriginal}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExportText('current', 'original')} className="text-xs font-medium cursor-pointer">
+                    {t.exportCurrentPage} (page_{activeImageIndex + 1}_ocr_original_script.txt)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('all', 'original')} className="text-xs font-medium cursor-pointer">
+                    {t.exportAllPages} (full_ocr_original_script.txt)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* قائمة تصدير النص المترجم */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5 text-xs font-bold rounded-xl">
+                    <Download className="w-4 h-4" />
+                    {t.exportTranslated}
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-xl">
+                  <DropdownMenuLabel className="text-xs font-bold">{t.exportTranslated}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExportText('current', 'translated')} className="text-xs font-medium cursor-pointer">
+                    {t.exportCurrentPage} (page_{activeImageIndex + 1}_translated_script.txt)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('all', 'translated')} className="text-xs font-medium cursor-pointer">
+                    {t.exportAllPages} (full_translated_script.txt)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 

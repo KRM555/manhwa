@@ -3,7 +3,6 @@ import JSZip from 'jszip';
 import {
   ArrowLeft,
   Download,
-  Save,
   Sparkles,
   Key,
   Globe,
@@ -12,13 +11,6 @@ import {
   Moon,
   Trash2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
 
 export interface ExtractedText {
   id: string;
@@ -49,7 +41,7 @@ const CATEGORIES = [
   { value: 'other', labelAr: 'أخرى (Other)', labelEn: 'Other' },
 ];
 
-const CANDIDATE_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash'];
+const CANDIDATE_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro'];
 
 const I18N = {
   ar: {
@@ -61,7 +53,6 @@ const I18N = {
     extractOnly: 'استخراج النص فقط (دون ترجمة)',
     analyzeBtn: 'بدء تحليل واستخراج الصفحات',
     exportBtn: 'تصدير TXT المنسق (لكل الصفحات)',
-    saveDraft: 'حفظ المسودة',
     backToUpload: 'العودة للرفع',
     preview: 'معاينة الصفحة',
     extractedTexts: 'النصوص المستخرجة',
@@ -81,7 +72,6 @@ const I18N = {
     extractOnly: 'Extract Text Only (No Translation)',
     analyzeBtn: 'Start Extraction & Analysis',
     exportBtn: 'Export Formatted TXT (All Pages)',
-    saveDraft: 'Save Draft',
     backToUpload: 'Back to Upload',
     preview: 'Page Preview',
     extractedTexts: 'Extracted Texts',
@@ -180,7 +170,7 @@ export default function Index() {
             });
           }
         } catch (err) {
-          toast.error(lang === 'ar' ? 'حدث خطأ أثناء قراءة ملف الـ ZIP' : 'Error reading ZIP file');
+          alert(lang === 'ar' ? 'حدث خطأ أثناء قراءة ملف الـ ZIP' : 'Error reading ZIP file');
         }
       } else if (file.type.startsWith('image/')) {
         if (newPages.length + pages.length >= 10) break;
@@ -195,7 +185,7 @@ export default function Index() {
     }
 
     if (pages.length + newPages.length > 10) {
-      toast.warning(t.maxImagesError);
+      alert(t.maxImagesError);
     }
 
     setPages((prev) => [...prev, ...newPages].slice(0, 10));
@@ -290,17 +280,16 @@ export default function Index() {
 
   const handleAnalyzeAll = async () => {
     if (pages.length === 0) {
-      toast.error(t.noImages);
+      alert(t.noImages);
       return;
     }
 
     if (!apiKey || apiKey.trim() === '') {
-      toast.error(lang === 'ar' ? 'يرجى إدخال مفتاح Gemini API Key أولاً' : 'Please enter Gemini API Key');
+      alert(lang === 'ar' ? 'يرجى إدخال مفتاح Gemini API Key أولاً' : 'Please enter Gemini API Key');
       return;
     }
 
     setIsAnalyzing(true);
-    toast.info(t.analyzing);
 
     const updatedPages = [...pages];
 
@@ -312,7 +301,6 @@ export default function Index() {
     setPages(updatedPages);
     setIsAnalyzing(false);
     setView('results');
-    toast.success(lang === 'ar' ? 'تم استخراج كافة الصفحات بنجاح!' : 'All pages extracted successfully!');
   };
 
   const handleExport = () => {
@@ -327,7 +315,7 @@ export default function Index() {
           .map((item) => formatTextByCategory(item.translatedText, item.category))
           .join('\n\n');
       }
-      fileContent += `\n\n${'=' .repeat(30)}\n\n`;
+      fileContent += `\n\n==============================\n\n`;
     });
 
     const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
@@ -339,8 +327,6 @@ export default function Index() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-
-    toast.success(lang === 'ar' ? 'تم تصدير ملف النصوص المنسق!' : 'Formatted script exported!');
   };
 
   const updateActiveItem = (id: string, field: keyof ExtractedText, value: string) => {
@@ -358,55 +344,47 @@ export default function Index() {
   const activePage = pages[activePageIndex];
 
   return (
-    <div
-      className={`min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto ${
-        lang === 'ar' ? 'dir-rtl' : 'dir-ltr'
-      }`}
-    >
-      <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8 max-w-7xl mx-auto ${lang === 'ar' ? 'dir-rtl' : 'dir-ltr'}`}>
+      <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-4 gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
+          <h1 className="text-2xl font-extrabold tracking-tight text-orange-500">
             {t.title}
           </h1>
-          <p className="text-xs text-muted-foreground">{t.subtitle}</p>
+          <p className="text-xs text-slate-400">{t.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 border border-border px-2.5 py-1 rounded-lg bg-card">
+          <div className="flex items-center gap-2 border border-slate-800 px-3 py-1.5 rounded-lg bg-slate-900">
             <Key className="w-4 h-4 text-orange-500 shrink-0" />
-            <Input
+            <input
               type="password"
               placeholder={t.apiKeyPlaceholder}
               value={apiKey}
               onChange={(e) => handleSaveApiKey(e.target.value)}
-              className="h-8 text-xs border-0 focus-visible:ring-0 w-36 sm:w-48 dir-ltr"
+              className="bg-transparent text-xs outline-none w-36 sm:w-48 dir-ltr text-slate-200 placeholder:text-slate-500"
             />
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-            className="gap-1 text-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-semibold"
           >
             <Globe className="w-3.5 h-3.5 text-orange-500" />
             {lang === 'ar' ? 'English' : 'العربية'}
-          </Button>
+          </button>
 
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="text-xs"
+            className="p-2 border border-slate-800 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs"
           >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
-          </Button>
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-slate-300" />}
+          </button>
         </div>
       </header>
 
       {view === 'upload' ? (
         <div className="space-y-6">
-          <Card className="border-2 border-dashed border-border hover:border-orange-500/50 transition-colors p-8 text-center rounded-2xl bg-card/50">
+          <div className="border-2 border-dashed border-slate-800 hover:border-orange-500/50 transition-colors p-8 text-center rounded-2xl bg-slate-900/50">
             <input
               type="file"
               multiple
@@ -421,102 +399,93 @@ export default function Index() {
               </div>
               <div>
                 <h3 className="font-bold text-lg">{t.uploadTitle}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{t.uploadDesc}</p>
+                <p className="text-xs text-slate-400 mt-1">{t.uploadDesc}</p>
               </div>
             </label>
-          </Card>
+          </div>
 
-          <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-xl border border-border gap-4">
-            {/* Custom Toggle Switch */}
-            <div
-              className="flex items-center gap-3 cursor-pointer select-none"
-              onClick={() => setExtractOnly(!extractOnly)}
-            >
-              <div
-                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                  extractOnly ? 'bg-orange-600' : 'bg-muted-foreground/30'
-                }`}
-              >
-                <div
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                    extractOnly ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </div>
-              <Label className="text-sm font-semibold cursor-pointer">
-                {t.extractOnly}
-              </Label>
-            </div>
+          <div className="flex flex-wrap items-center justify-between bg-slate-900 p-4 rounded-xl border border-slate-800 gap-4">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={extractOnly}
+                onChange={(e) => setExtractOnly(e.target.checked)}
+                className="w-4 h-4 accent-orange-600 rounded"
+              />
+              <span className="text-sm font-semibold text-slate-200">{t.extractOnly}</span>
+            </label>
 
-            <Button
+            <button
               onClick={handleAnalyzeAll}
               disabled={isAnalyzing || pages.length === 0}
-              className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-sm font-bold w-full sm:w-auto"
+              className="bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2"
             >
               <Sparkles className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-              {t.analyzeBtn} ({pages.length})
-            </Button>
+              {isAnalyzing ? t.analyzing : `${t.analyzeBtn} (${pages.length})`}
+            </button>
           </div>
 
           {pages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               {pages.map((page, idx) => (
-                <Card key={page.id} className="relative group overflow-hidden border-border rounded-xl">
+                <div key={page.id} className="relative group overflow-hidden border border-slate-800 rounded-xl bg-slate-900">
                   <img src={page.imageUrl} alt={page.name} className="w-full h-44 object-cover" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="h-8 w-8"
+                    <button
+                      className="bg-red-600 hover:bg-red-700 p-2 rounded-lg text-white"
                       onClick={() => handleRemovePage(idx)}
                     >
                       <Trash2 className="w-4 h-4" />
-                    </Button>
+                    </button>
                   </div>
-                  <div className="p-2 text-center text-xs truncate bg-card font-medium">
+                  <div className="p-2 text-center text-xs truncate font-medium bg-slate-900 text-slate-300">
                     {t.page} {idx + 1}
                   </div>
-                </Card>
+                </div>
               ))}
             </div>
           )}
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-2xl border border-border gap-3">
-            <Button variant="outline" onClick={() => setView('upload')} className="gap-2 text-xs font-bold">
+          <div className="flex flex-wrap items-center justify-between bg-slate-900 p-4 rounded-2xl border border-slate-800 gap-3">
+            <button
+              onClick={() => setView('upload')}
+              className="flex items-center gap-2 border border-slate-800 bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl text-xs font-bold"
+            >
               <ArrowLeft className="w-4 h-4" /> {t.backToUpload}
-            </Button>
+            </button>
 
             <div className="flex items-center gap-1.5 overflow-x-auto max-w-md py-1">
               {pages.map((p, idx) => (
-                <Button
+                <button
                   key={p.id}
-                  size="sm"
-                  variant={activePageIndex === idx ? 'default' : 'secondary'}
-                  className={`text-xs px-3 font-bold ${
-                    activePageIndex === idx ? 'bg-orange-600 text-white' : ''
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-colors ${
+                    activePageIndex === idx
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                   onClick={() => setActivePageIndex(idx)}
                 >
                   {t.page} {idx + 1}
-                </Button>
+                </button>
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold">
-                <Download className="w-4 h-4" /> {t.exportBtn}
-              </Button>
-            </div>
+            <button
+              onClick={handleExport}
+              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> {t.exportBtn}
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
-              <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
-                <span>{t.preview} - {t.page} {activePageIndex + 1}</span>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 flex flex-col h-[750px] overflow-hidden">
+              <div className="p-3 border-b border-slate-800 bg-slate-900 text-xs text-slate-400 font-semibold">
+                {t.preview} - {t.page} {activePageIndex + 1}
               </div>
-              <CardContent className="p-4 flex-1 overflow-y-auto flex justify-center items-start">
+              <div className="p-4 flex-1 overflow-y-auto flex justify-center items-start">
                 {activePage?.imageUrl ? (
                   <img
                     src={activePage.imageUrl}
@@ -524,65 +493,59 @@ export default function Index() {
                     className="w-full max-w-[450px] h-auto object-contain rounded-lg shadow-md"
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground m-auto">{t.noImages}</p>
+                  <p className="text-sm text-slate-500 m-auto">{t.noImages}</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             <div className="space-y-4 h-[750px] overflow-y-auto pl-2">
-              <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
-                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+              <div className="sticky top-0 bg-slate-950 py-2 z-10">
+                <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-orange-500" />
                   {t.extractedTexts} ({activePage?.items?.length || 0})
                 </h3>
               </div>
 
               {activePage?.items?.map((item, idx) => (
-                <Card
+                <div
                   key={item.id}
-                  className="p-4 space-y-3 border-border rounded-xl shadow-sm hover:border-orange-500/30 transition-colors"
+                  className="p-4 space-y-3 border border-slate-800 rounded-xl bg-slate-900/80 hover:border-orange-500/30 transition-colors"
                 >
-                  <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
-                    <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
+                  <div className="flex justify-between items-center text-xs font-semibold">
+                    <span className="bg-orange-500/10 text-orange-400 px-2.5 py-1 rounded-md font-bold">
                       #{idx + 1}
                     </span>
-                    <Select
+                    <select
                       value={item.category}
-                      onValueChange={(val) => updateActiveItem(item.id, 'category', val)}
+                      onChange={(e) => updateActiveItem(item.id, 'category', e.target.value)}
+                      className="bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs outline-none"
                     >
-                      <SelectTrigger className="w-[180px] h-8 text-xs font-bold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {lang === 'ar' ? cat.labelAr : cat.labelEn}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      {CATEGORIES.map((cat) => (
+                        <option key={cat.value} value={cat.value}>
+                          {lang === 'ar' ? cat.labelAr : cat.labelEn}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-muted-foreground">{t.originalText}</Label>
-                    <Textarea
+                    <label className="text-xs font-semibold text-slate-400 block">{t.originalText}</label>
+                    <textarea
                       value={item.originalText}
                       onChange={(e) => updateActiveItem(item.id, 'originalText', e.target.value)}
-                      className="min-h-[50px] text-sm dir-ltr bg-muted/20"
+                      className="w-full p-2 text-sm dir-ltr bg-slate-950 border border-slate-800 rounded-lg text-slate-300 outline-none focus:border-orange-500 min-h-[50px]"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-orange-600 dark:text-orange-400">
-                      {t.translatedText}
-                    </Label>
-                    <Textarea
+                    <label className="text-xs font-semibold text-orange-400 block">{t.translatedText}</label>
+                    <textarea
                       value={item.translatedText}
                       onChange={(e) => updateActiveItem(item.id, 'translatedText', e.target.value)}
-                      className="min-h-[50px] text-sm font-medium bg-card"
+                      className="w-full p-2 text-sm font-medium bg-slate-950 border border-slate-800 rounded-lg text-slate-100 outline-none focus:border-orange-500 min-h-[50px]"
                     />
                   </div>
-                </Card>
+                </div>
               ))}
             </div>
           </div>

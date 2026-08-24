@@ -41,9 +41,13 @@ export function AuthModal() {
       return;
     }
     setLoading(true);
+    
+    // التعديل هنا: مسح أي مسافات قبل أو بعد الإيميل
+    const cleanEmail = email.trim();
+
     const { error } = isSignUp 
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
+      ? await supabase.auth.signUp({ email: cleanEmail, password })
+      : await supabase.auth.signInWithPassword({ email: cleanEmail, password });
 
     if (error) {
       toast.error(error.message);

@@ -40,6 +40,34 @@ const CANDIDATE_MODELS = [
   'gemini-3.6-flash',
 ];
 
+// دالة تنسيق النص المترجم كـ Prefixes قبل النص طبقاً للرموز المطلوبة
+const formatTextByCategory = (text: string, category: string): string => {
+  const cleanText = text.trim();
+  switch (category) {
+    case 'dialogue':
+      return `"": ${cleanText}`;
+    case 'thought':
+      return `(): ${cleanText}`;
+    case 'scream':
+    case 'anger':
+    case 'fear':
+      return `<>: ${cleanText}`;
+    case 'system':
+      return `[]: ${cleanText}`;
+    case 'phone':
+    case 'message':
+      return `**: ${cleanText}`;
+    case 'narrator':
+      return `NA: ${cleanText}`;
+    case 'sfx':
+      return `sfx: ${cleanText}`;
+    case 'whisper':
+      return `ST: ${cleanText}`;
+    default:
+      return cleanText;
+  }
+};
+
 export default function Index() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -84,42 +112,41 @@ export default function Index() {
     localStorage.setItem('gemini_api_key', key);
   };
 
-  // 1. تفعيل حفظ المسودة
   const handleSaveDraft = () => {
     if (items.length === 0) {
       toast.error('لا توجد نصوص لحفظها كمسودة');
       return;
     }
     localStorage.setItem('manga_draft_items', JSON.stringify(items));
-    toast.success('تم حفظ المسودة بنجاح في ذاكرة المتصفح!');
+    toast.success('تم حفظ المسودة بنجاح!');
   };
 
-  // 2. تفعيل تصدير النصوص إلى ملف TXT
   const handleExport = () => {
     if (items.length === 0) {
       toast.error('لا توجد نصوص لتصديرها');
       return;
     }
 
-    const fileContent = items
-      .map((item, idx) => {
-        const catLabel = CATEGORIES.find((c) => c.value === item.category)?.label || item.category;
-        return `[فقرة #${idx + 1}] - (${catLabel})\nالنص الأصلي: ${item.originalText}\nالترجمة: ${item.translatedText}\n----------------------------------------`;
-      })
+    // ترويسة رقم الصفحة
+    let fileContent = `Page 1\n\n`;
+
+    // تصدير البادئة + النص المترجم فقط مع تخطي النص الصيني الأصلي
+    fileContent += items
+      .map((item) => formatTextByCategory(item.translatedText, item.category))
       .join('\n\n');
 
     const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const cleanName = fileName ? fileName.replace(/\.[^/.]+$/, '') : 'manga_translation';
-    link.download = `${cleanName}_translated.txt`;
+    const cleanName = fileName ? fileName.replace(/\.[^/.]+$/, '') : 'manga_page';
+    link.download = `${cleanName}_script.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success('تم تصدير ملف النصوص بنجاح!');
+    toast.success('تم تصدير ملف النصوص المنسق بنجاح!');
   };
 
   const handleAnalyze = async () => {
@@ -129,27 +156,23 @@ export default function Index() {
     }
 
     if (!apiKey || apiKey.trim() === '') {
-      toast.error('يرجى إدخال مفتاح Gemini API Key في أعلى الصفحة أولاً');
+      toast.error('يرجى إدخال مفتاح Gemini API Key أولاً');
       return;
     }
 
     setIsAnalyzing(true);
-    toast.info('جاري الاتصال بـ Gemini واستخراج النصوص...');
+    toast.info('جاري معالجة واستخراج النصوص بواسطة Gemini...');
 
     const mimeTypeMatch = imagePreview.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
     const base64Data = imagePreview.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
     const promptText = `
-      أنت مترجم مانجا وويب تون محترف وخبير في التعرف الضوئي على الحروف (OCR).
-      قم بفحص وتحليل هذه الصورة واستخراج كاااافة النصوص والفقرات بدون استثناء من البداية للنهاية.
-      يشمل ذلك: الحوارات داخل الفقاقيع، الأفكار، المؤثرات الصوتية (SFX)، نصوص النظام، والهمس.
-      
-      تعليمات الهيكلة:
-      1. استخرج كافة النصوص بترتيب القراءة البصري (من الأعلى إلى الأسفل).
-      2. ترجم كافة النصوص بدقة عالية إلى اللغة العربية.
-      3. قم بتصنيف كل فقرة إلى الفئة المناسبة لها (dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other).
-      ${config.extractSFX ? '4. احرص على استخراج كافة المؤثرات الصوتية (SFX).' : '4. تجاهل المؤثرات الصوتية غير المكتوبة بداخل فقاعات.'}
+      أنت مترجم مانجا وويب تون محترف لخلق سكريبتات تبييض سريعة.
+      قم بتحليل الصورة واستخراج كافة النصوص بالترتيب من الأعلى للأسفل.
+      صنّف كل عنصر إلى إحدى الفئات التالية:
+      (dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other).
+      ترجم كافة النصوص إلى اللغة العربية بدقة ودون تحريف.
     `;
 
     let success = false;
@@ -175,7 +198,7 @@ export default function Index() {
                 responseMimeType: 'application/json',
                 responseSchema: {
                   type: 'ARRAY',
-                  description: 'قائمة بكل الفقرات المستخرجة',
+                  description: 'قائمة الفقرات المستخرجة',
                   items: {
                     type: 'OBJECT',
                     properties: {
@@ -209,7 +232,7 @@ export default function Index() {
           }));
 
           setItems(formattedItems);
-          toast.success(`تم استخراج وترجمة ${formattedItems.length} فقرة بنجاح!`);
+          toast.success(`تم استخراج وترجمة ${formattedItems.length} فقرة!`);
           setView('results');
           success = true;
           break;
@@ -240,7 +263,7 @@ export default function Index() {
           <h1 className="text-2xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
             Manga Translator Studio
           </h1>
-          <p className="text-xs text-muted-foreground">أداة استخراج وترجمة المانجا والويب تون بالذكاء الاصطناعي</p>
+          <p className="text-xs text-muted-foreground">أداة استخراج وترجمة وتنسيق سكريبتات الويب تون</p>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -255,7 +278,7 @@ export default function Index() {
         </div>
       </header>
 
-      {/* Main View */}
+      {/* Main Content */}
       {view === 'upload' ? (
         <UploadZone
           imagePreview={imagePreview}
@@ -284,14 +307,12 @@ export default function Index() {
                 <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} /> إعادة التحليل
               </Button>
               
-              {/* زر حفظ المسودة */}
               <Button variant="secondary" onClick={handleSaveDraft} className="gap-2 text-xs">
                 <Save className="w-4 h-4" /> حفظ المسودة
               </Button>
 
-              {/* زر تصدير النصوص */}
               <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold">
-                <Download className="w-4 h-4" /> تصدير النصوص
+                <Download className="w-4 h-4" /> تصدير TXT المنسق
               </Button>
             </div>
           </div>
@@ -300,17 +321,16 @@ export default function Index() {
             <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
               <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
                 <span>معاينة الصفحة</span>
-                <span>استخدم التمرير (Scroll) لعرض كامل الشريط</span>
               </div>
               <CardContent className="p-4 flex-1 overflow-y-auto flex justify-center items-start">
                 {imagePreview ? (
                   <img
                     src={imagePreview}
-                    alt="Webtoon Page"
+                    alt="Manga Page"
                     className="w-full max-w-[450px] h-auto object-contain rounded-lg shadow-md"
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground m-auto">لا توجد صورة معروضة</p>
+                  <p className="text-sm text-muted-foreground m-auto">لا توجد صورة</p>
                 )}
               </CardContent>
             </Card>
@@ -323,56 +343,50 @@ export default function Index() {
                 </h3>
               </div>
 
-              {items.length === 0 ? (
-                <div className="text-center p-12 text-muted-foreground border border-dashed rounded-2xl bg-card/50">
-                  لم يتم العثور على أي نصوص في هذه الصورة.
-                </div>
-              ) : (
-                items.map((item, idx) => (
-                  <Card key={item.id} className="p-4 space-y-3 border-border rounded-xl shadow-sm hover:border-orange-500/30 transition-colors">
-                    <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
-                      <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
-                        فقرة #{idx + 1}
-                      </span>
-                      <Select
-                        value={item.category}
-                        onValueChange={(val) => updateItem(item.id, 'category', val)}
-                      >
-                        <SelectTrigger className="w-[180px] h-8 text-xs font-bold">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATEGORIES.map((cat) => (
-                            <SelectItem key={cat.value} value={cat.value}>
-                              {cat.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+              {items.map((item, idx) => (
+                <Card key={item.id} className="p-4 space-y-3 border-border rounded-xl shadow-sm hover:border-orange-500/30 transition-colors">
+                  <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
+                    <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
+                      فقرة #{idx + 1}
+                    </span>
+                    <Select
+                      value={item.category}
+                      onValueChange={(val) => updateItem(item.id, 'category', val)}
+                    >
+                      <SelectTrigger className="w-[180px] h-8 text-xs font-bold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((cat) => (
+                          <SelectItem key={cat.value} value={cat.value}>
+                            {cat.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground">النص الأصلي:</Label>
-                      <Textarea
-                        value={item.originalText}
-                        onChange={(e) => updateItem(item.id, 'originalText', e.target.value)}
-                        className="min-h-[50px] text-sm dir-ltr bg-muted/20"
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-muted-foreground">النص الأصلي:</Label>
+                    <Textarea
+                      value={item.originalText}
+                      onChange={(e) => updateItem(item.id, 'originalText', e.target.value)}
+                      className="min-h-[50px] text-sm dir-ltr bg-muted/20"
+                    />
+                  </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-orange-600 dark:text-orange-400">
-                        النص المترجم:
-                      </Label>
-                      <Textarea
-                        value={item.translatedText}
-                        onChange={(e) => updateItem(item.id, 'translatedText', e.target.value)}
-                        className="min-h-[50px] text-sm font-medium bg-card"
-                      />
-                    </div>
-                  </Card>
-                ))
-              )}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                      النص المترجم:
+                    </Label>
+                    <Textarea
+                      value={item.translatedText}
+                      onChange={(e) => updateItem(item.id, 'translatedText', e.target.value)}
+                      className="min-h-[50px] text-sm font-medium bg-card"
+                    />
+                  </div>
+                </Card>
+              ))}
             </div>
           </div>
         </div>

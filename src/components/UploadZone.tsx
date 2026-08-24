@@ -11,34 +11,32 @@ interface UploadZoneProps {
   onStartProcessing?: () => void;
 }
 
-// دالة الاتصال المباشر بـ Gemini API
-async function processImageWithGeminiDirect(
+export async function processImageWithGeminiDirect(
   imageBase64: string,
   apiKey: string,
   targetLang: string,
   isOcrOnly: boolean
 ) {
-  const systemInstruction = `You are a professional manga/webtoon OCR and translation tool. 
-Analyze the image and extract all text bubbles, thought boxes, SFX, and system texts in reading order (top-to-bottom, right-to-left for manga, top-to-bottom for webtoons).
-Return ONLY a valid JSON array of objects. Do not include markdown code blocks like \`\`\`json.`;
+  const systemInstruction = `You are an expert manga/webtoon OCR and translation tool. 
+Analyze the input image carefully. Locate all speech bubbles, text boxes, system windows, and sound effects (SFX).
+Extract all text in reading order (top-to-bottom).
+Return ONLY a valid JSON array of objects without any conversational text.`;
 
   const prompt = isOcrOnly
-    ? `Extract all text elements. 
-Return JSON format: 
+    ? `Extract all text elements. Return raw JSON format:
 [
   {
-    "originalText": "text in original language",
-    "translatedText": "text in original language",
-    "category": "dialogue" | "thought" | "scream" | "sfx" | "system" | "narrator"
+    "originalText": "text in comic",
+    "translatedText": "text in comic",
+    "category": "dialogue"
   }
 ]`
-    : `Extract all text elements and translate them into ${targetLang === 'ar' ? 'Arabic' : 'English'}.
-Return JSON format:
+    : `Extract all text elements and translate them into ${targetLang === 'ar' ? 'Arabic' : 'English'}. Return raw JSON format:
 [
   {
-    "originalText": "text in original language",
+    "originalText": "text in comic",
     "translatedText": "translated text",
-    "category": "dialogue" | "thought" | "scream" | "sfx" | "system" | "narrator"
+    "category": "dialogue"
   }
 ]`;
 
@@ -67,8 +65,7 @@ Return JSON format:
           },
         ],
         generationConfig: {
-          response_mime_type: 'application/json',
-          temperature: 0.2,
+          temperature: 0.1,
         },
       }),
     }
@@ -76,12 +73,15 @@ Return JSON format:
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || 'فشل الاتصال بـ Gemini API');
+    throw new Error(errorData.error?.message || `فشل الاتصال: ${response.statusText}`);
   }
 
   const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
   
+  // تنظيف النص من صيغ markdown markdown ```json ``` التي تسبب فشل Parsing
+  rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
   try {
     return JSON.parse(rawText);
   } catch (e) {
@@ -137,12 +137,15 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
         let extractedItems: any[] = [];
         try {
           const apiResult = await processImageWithGeminiDirect(base64Data, apiKey, targetLang, isOcrOnly);
-          extractedItems = apiResult.map((item: any, idx: number) => ({
-            id: `item_${Date.now()}_${idx}`,
-            originalText: item.originalText || '',
-            translatedText: item.translatedText || item.originalText || '',
-            category: item.category || 'dialogue',
-          }));
+          
+          if (Array.isArray(apiResult)) {
+            extractedItems = apiResult.map((item: any, idx: number) => ({
+              id: `item_${Date.now()}_${idx}`,
+              originalText: item.originalText || '',
+              translatedText: item.translatedText || item.originalText || '',
+              category: item.category || 'dialogue',
+            }));
+          }
         } catch (err: any) {
           console.error('API Error:', err);
           toast.error(err.message || `تعذر استخراج النصوص للصورة ${file.name}`);

@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { GoogleGenAI, Type } from '@google/genai';
 
 export interface ExtractedText {
   id: string;
@@ -42,7 +41,7 @@ export default function Index() {
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
-  // مفتاح Gemini API (يقرأ من متغيرات البيئة أو الذاكرة المحلية)
+  // مفتاح Gemini API
   const [apiKey, setApiKey] = useState<string>(
     import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || ''
   );
@@ -80,13 +79,13 @@ export default function Index() {
     setConfig((prev) => ({ ...prev, ...updated }));
   };
 
-  // حفظ مفتاح API Key في localStorage
+  // حفظ مفتاح API Key
   const handleSaveApiKey = (key: string) => {
     setApiKey(key);
     localStorage.setItem('gemini_api_key', key);
   };
 
-  // دالة التحليل والاستخراج باستخدام Gemini API الحقيقي
+  // دالة التحليل والاستخراج باستخدام Gemini REST API المباشر (بدون مكتبات خارجية)
   const handleAnalyze = async () => {
     if (!imagePreview) {
       toast.error('الرجاء اختيار صورة أولاً');
@@ -94,22 +93,19 @@ export default function Index() {
     }
 
     if (!apiKey || apiKey.trim() === '') {
-      toast.error('يرجى أدخال مفتاح Gemini API Key في أعلى الصفحة أولاً');
+      toast.error('يرجى إدخال مفتاح Gemini API Key في أعلى الصفحة أولاً');
       return;
     }
 
     setIsAnalyzing(true);
-    toast.info('جاري إرسال الصورة لـ Gemini واستخراج كامل النصوص...');
+    toast.info('جاري إرسال الصورة لـ Gemini واستخراج كافة النصوص...');
 
     try {
-      const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
-
-      // تحضير بيانات الـ Base64 ونوع الصورة
       const mimeTypeMatch = imagePreview.match(/^data:(image\/[a-zA-Z+]+);base64,/);
       const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
       const base64Data = imagePreview.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
-      const prompt = `
+      const promptText = `
         أنت مترجم مانجا وويب تون محترف وخبير في التعرف الضوئي على الحروف (OCR).
         قم بفحص وتحليل هذه الصورة واستخراج كاااافة النصوص والفقرات بدون استثناء من البداية للنهاية.
         يشمل ذلك: الحوارات داخل الفقاقيع، الأفكار، المؤثرات الصوتية (SFX)، نصوص النظام، والهمس.
@@ -117,46 +113,64 @@ export default function Index() {
         تعليمات الهيكلة:
         1. استخرج كافة النصوص بترتيب القراءة البصري (من الأعلى إلى الأسفل).
         2. ترجم كافة النصوص بدقة عالية إلى اللغة العربية.
-        3. قم بتصنيف كل فقرة إلى الفئة المناسبة لها.
+        3. قم بتصنيف كل فقرة إلى الفئة المناسبة لها (dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other).
         ${config.extractSFX ? '4. احرص على استخراج كافة المؤثرات الصوتية (SFX).' : '4. تجاهل المؤثرات الصوتية غير المكتوبة بداخل فقاعات.'}
       `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: mimeType,
-            },
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          prompt,
-        ],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            description: 'قائمة بكل الفقرات المستخرجة من الصفحة',
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.STRING },
-                originalText: { type: Type.STRING, description: 'النص الأصلي بالكامل' },
-                translatedText: { type: Type.STRING, description: 'الترجمة العربية الكاملة' },
-                category: {
-                  type: Type.STRING,
-                  description: 'نوع النص: dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other',
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data,
+                    },
+                  },
+                  {
+                    text: promptText,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'ARRAY',
+                description: 'قائمة بكل الفقرات المستخرجة من الصفحة',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    id: { type: 'STRING' },
+                    originalText: { type: 'STRING' },
+                    translatedText: { type: 'STRING' },
+                    category: { type: 'STRING' },
+                  },
+                  required: ['id', 'originalText', 'translatedText', 'category'],
                 },
               },
-              required: ['id', 'originalText', 'translatedText', 'category'],
             },
-          },
-        },
-      });
+          }),
+        }
+      );
 
-      const responseText = response.text;
-      if (responseText) {
-        const parsedItems: ExtractedText[] = JSON.parse(responseText);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'فشل الاتصال بـ API');
+      }
+
+      const data = await response.json();
+      const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (rawJsonText) {
+        const parsedItems: ExtractedText[] = JSON.parse(rawJsonText);
         const formattedItems = parsedItems.map((item, idx) => ({
           ...item,
           id: item.id || `item_${idx}_${Date.now()}`,
@@ -170,13 +184,12 @@ export default function Index() {
       }
     } catch (error: any) {
       console.error('Gemini API Error:', error);
-      toast.error(`حدث خطأ أثناء الاتصال بـ API: ${error.message || 'خطأ غير معروف'}`);
+      toast.error(`حدث خطأ أثناء استخراج النصوص: ${error.message || 'خطأ غير معروف'}`);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // تعديل نص أو فئة في القائمة
   const updateItem = (id: string, field: keyof ExtractedText, value: string) => {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
@@ -247,7 +260,7 @@ export default function Index() {
 
           {/* Grid View */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* معاينة الويب تون (بدون انغلاق الصورة ومع دعم السكرول) */}
+            {/* معاينة الويب تون */}
             <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
               <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
                 <span>معاينة الصفحة</span>

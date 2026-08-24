@@ -30,6 +30,7 @@ export default function Index() {
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
   const [targetLang, setTargetLang] = useState<'ar' | 'en'>('ar');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isOcrOnly, setIsOcrOnly] = useState<boolean>(false);
 
   // Typer Tags Settings State
   const [typerRules, setTyperRules] = useState<TyperRule[]>(() => {
@@ -69,7 +70,12 @@ export default function Index() {
           ? 'Translate each text block into fluent English capturing tone and context.'
           : 'Translate each text block into fluent Arabic capturing tone and context.';
 
-      const promptText = `You are a professional Manhua/Manga/Manhwa translator and typesetter assistant.
+      const promptText = isOcrOnly
+        ? `You are an expert Manga/Manhua/Manhwa OCR tool.
+Extract ONLY raw original text from each bubble/text box without translating it.
+Strictly return a raw JSON array of objects format:
+[{"id": "1", "originalText": "text", "translatedText": "text", "category": "dialogue"}]`
+        : `You are a professional Manhua/Manga/Manhwa translator and typesetter assistant.
 
 1. Perform OCR to extract all visible text.
 2. ${targetLangInstruction}
@@ -250,7 +256,19 @@ Return STRICTLY a raw JSON array of objects:
                     </button>
                   </div>
                 </div>
-
+<div className="mt-4 pt-3 border-t border-slate-800">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={isOcrOnly}
+                    onChange={(e) => setIsOcrOnly(e.target.checked)}
+                    className="w-4 h-4 accent-orange-500 rounded cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-orange-400">
+                    استخراج النص الأصلي فقط (OCR Mode - بدون ترجمة)
+                  </span>
+                </label>
+              </div>
               </div>
             </div>
 

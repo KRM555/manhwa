@@ -1,4 +1,5 @@
 import { AuthModal } from '@/components/AuthModal';
+import { supabase } from '@/lib/supabase';
 import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { TranslationConfig } from '@/types/manga';
@@ -508,6 +509,17 @@ export default function Index() {
       setResultsMap((prev) => ({ ...prev, [activeImage.id]: res }));
       toast.success(t.successExtract);
       setView('results');
+      if (activeImage) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        supabase.from('user_history').insert({
+          user_id: session.user.id,
+          image_name: activeImage.name,
+          extracted_count: res.length,
+        });
+      }
+    });
+  }
     } else {
       toast.error(lang === 'ar' ? 'حدث خطأ أثناء معالجة الصورة' : 'Failed to process image');
     }

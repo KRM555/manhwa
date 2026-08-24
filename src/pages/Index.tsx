@@ -4,7 +4,7 @@ import { TranslationConfig } from '@/types/manga';
 import { 
   ArrowLeft, Download, Sparkles, Key, RefreshCw, 
   Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2,
-  ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown, Edit2
+  ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -97,7 +97,7 @@ const UI_TEXT = {
     tagPrefix: 'البادئة (Prefix)',
     tagSuffix: 'اللاحقة (Suffix)',
     add: 'إضافة',
-    editSiteTitle: 'تعديل اسم الموقع / الفصل',
+    deleteTag: 'حذف العلامة',
   },
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
@@ -133,17 +133,11 @@ const UI_TEXT = {
     tagPrefix: 'Prefix',
     tagSuffix: 'Suffix',
     add: 'Add Tag',
-    editSiteTitle: 'Edit Site/Chapter Title',
+    deleteTag: 'Delete Tag',
   },
 };
 
 export default function Index() {
-  // اسم الموقع القابل للتعديل والتأثير في الملف المصدّر
-  const [siteTitle, setSiteTitle] = useState<string>(() => {
-    return localStorage.getItem('custom_site_title') || 'Manhwa Transtool Studio';
-  });
-  const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
-
   const [images, setImages] = useState<ImageItem[]>([]);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
@@ -176,10 +170,6 @@ export default function Index() {
   useEffect(() => {
     localStorage.setItem('custom_manga_tags', JSON.stringify(tags));
   }, [tags]);
-
-  useEffect(() => {
-    localStorage.setItem('custom_site_title', siteTitle);
-  }, [siteTitle]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -254,6 +244,17 @@ export default function Index() {
     setNewTagPrefix('');
     setNewTagSuffix('');
     toast.success(lang === 'ar' ? 'تمت إضافة العلامة الجديدة!' : 'Custom tag added!');
+  };
+
+  // دالة حذف العلامات
+  const handleDeleteTag = (index: number) => {
+    if (tags.length <= 1) {
+      toast.error(lang === 'ar' ? 'يجب الإبقاء على علامة واحدة على الأقل' : 'At least one tag must remain');
+      return;
+    }
+    const updated = tags.filter((_, i) => i !== index);
+    setTags(updated);
+    toast.success(lang === 'ar' ? 'تم حذف العلامة بنجاح' : 'Tag deleted successfully');
   };
 
   const formatTextWithRules = (text: string, categoryVal: string): string => {
@@ -385,7 +386,6 @@ export default function Index() {
     setView('results');
   };
 
-  // دوال التصدير المطلوبة مع أسماء الملفات المحددة
   const handleExportText = (scope: 'current' | 'all', textType: 'original' | 'translated') => {
     const targetImages = scope === 'current' ? (activeImage ? [activeImage] : []) : images;
     if (targetImages.length === 0) return;
@@ -415,7 +415,6 @@ export default function Index() {
     const link = document.createElement('a');
     link.href = url;
     
-    // بناء اسم الملف بناءً على طلبك المحدد
     let fileName = '';
     if (textType === 'original') {
       fileName = scope === 'current' 
@@ -455,28 +454,10 @@ export default function Index() {
       {/* Header */}
       <header className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
-          {/* عنوان الموقع القابل للتعديل عند الضغط عليه أو زر التعديل */}
-          <div className="flex items-center gap-2">
-            {isEditingTitle ? (
-              <Input
-                value={siteTitle}
-                onChange={(e) => setSiteTitle(e.target.value)}
-                onBlur={() => setIsEditingTitle(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setIsEditingTitle(false)}
-                autoFocus
-                className="text-xl font-extrabold h-9 w-72 text-orange-600 dark:text-orange-500 rounded-lg"
-              />
-            ) : (
-              <h1
-                onClick={() => setIsEditingTitle(true)}
-                title={t.editSiteTitle}
-                className="text-2xl sm:text-3xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500 cursor-pointer flex items-center gap-2 hover:opacity-90 transition-opacity"
-              >
-                {siteTitle}
-                <Edit2 className="w-4 h-4 text-muted-foreground hover:text-orange-500 transition-colors" />
-              </h1>
-            )}
-          </div>
+          {/* اسم الموقع الثابت */}
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
+            Manhwa Transtool Studio
+          </h1>
           <p className="text-xs text-muted-foreground mt-0.5">{t.subtitle}</p>
         </div>
 
@@ -495,8 +476,8 @@ export default function Index() {
               <div className="space-y-4 py-2">
                 <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                   {tags.map((tag, i) => (
-                    <div key={tag.value} className="flex items-center gap-2 bg-muted/40 p-2 rounded-lg text-xs">
-                      <span className="font-bold w-28 truncate">{tag.label}</span>
+                    <div key={tag.value || i} className="flex items-center gap-1.5 bg-muted/40 p-2 rounded-lg text-xs">
+                      <span className="font-bold w-24 truncate">{tag.label}</span>
                       <Input
                         value={tag.prefix}
                         onChange={(e) => {
@@ -504,7 +485,7 @@ export default function Index() {
                           updated[i].prefix = e.target.value;
                           setTags(updated);
                         }}
-                        className="h-7 text-xs w-20"
+                        className="h-7 text-xs w-16"
                         placeholder="Prefix"
                       />
                       <Input
@@ -514,9 +495,19 @@ export default function Index() {
                           updated[i].suffix = e.target.value;
                           setTags(updated);
                         }}
-                        className="h-7 text-xs w-20"
+                        className="h-7 text-xs w-16"
                         placeholder="Suffix"
                       />
+                      {/* زر حذف العلامة */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteTag(i)}
+                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/50 shrink-0"
+                        title={t.deleteTag}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -716,7 +707,7 @@ export default function Index() {
                 <Play className="w-3.5 h-3.5" /> {t.analyzeAll}
               </Button>
 
-              {/* قائمة تصدير النص الأصلي فقط (OCR) */}
+              {/* قائمة تصدير النص الأصلي (OCR) */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 gap-1.5 text-xs font-bold rounded-xl">

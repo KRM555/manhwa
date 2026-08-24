@@ -207,8 +207,11 @@ Return STRICTLY a raw JSON array of objects:
       <main className="flex-1 w-full px-6 py-6 flex flex-col">
         {view === 'upload' ? (
           <div className="max-w-6xl mx-auto w-full space-y-6 my-auto">
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                
+           {/* Control Panel Card */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-sm relative overflow-hidden" dir="rtl">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                 {/* API Key Section */}
                 <div className="md:col-span-2 space-y-2">
                   <div className="flex items-center justify-between">
@@ -227,7 +230,8 @@ Return STRICTLY a raw JSON array of objects:
                   </div>
                   <input
                     type="password"
-                    className="w-full p-3.5 text-sm border border-slate-700 rounded-xl bg-slate-950/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 font-mono transition-all"
+                    className="w-full p-3.5 text-sm border border-slate-700 rounded-xl bg-slate-950/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 font-mono transition-all text-left"
+                    dir="ltr"
                     placeholder="ضع الـ API Key الخاص بك هنا..."
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
@@ -263,10 +267,9 @@ Return STRICTLY a raw JSON array of objects:
                     </button>
                   </div>
                 </div>
-
               </div>
 
-              {/* OCR Toggle Option */}
+              {/* OCR Toggle */}
               <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-start">
                 <label className="flex items-center gap-2.5 cursor-pointer select-none text-sm text-slate-300 hover:text-white transition-colors">
                   <input
@@ -280,6 +283,7 @@ Return STRICTLY a raw JSON array of objects:
                   </span>
                 </label>
               </div>
+            </div>
 
             {/* Upload Zone */}
             <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-2 shadow-2xl">

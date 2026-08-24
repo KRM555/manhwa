@@ -207,18 +207,15 @@ Return STRICTLY a raw JSON array of objects:
       <main className="flex-1 w-full px-6 py-6 flex flex-col">
         {view === 'upload' ? (
           <div className="max-w-6xl mx-auto w-full space-y-6 my-auto">
-           {/* Control Panel Card */}
+          {/* Control Panel Card */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-sm relative overflow-hidden" dir="rtl">
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                
                 {/* API Key Section */}
                 <div className="md:col-span-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
-                      <KeyRound className="w-4 h-4 text-orange-400" />
-                      Gemini API Key:
-                    </label>
+                  <div className="flex items-center justify-between flex-row-reverse">
                     <a
                       href="https://aistudio.google.com/app/apikey"
                       target="_blank"
@@ -227,6 +224,10 @@ Return STRICTLY a raw JSON array of objects:
                     >
                       احصل على مفتاح مجاني من هنا ↗
                     </a>
+                    <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
+                      <KeyRound className="w-4 h-4 text-orange-400" />
+                      Gemini API Key:
+                    </label>
                   </div>
                   <input
                     type="password"
@@ -267,6 +268,7 @@ Return STRICTLY a raw JSON array of objects:
                     </button>
                   </div>
                 </div>
+
               </div>
 
               {/* OCR Toggle */}

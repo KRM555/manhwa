@@ -239,7 +239,7 @@ Return STRICTLY a raw JSON array of objects:
                   />
                 </div>
 
-                {/* Target Language Selection */}
+               {/* Target Language Selection */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
                     <Globe className="w-4 h-4 text-orange-400" />
@@ -248,27 +248,28 @@ Return STRICTLY a raw JSON array of objects:
                   <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
                     <button
                       onClick={() => setTargetLang('ar')}
-                      className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                         targetLang === 'ar'
                           ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      العربية (Arabic)
+                      <span className="text-sm">🇪🇬</span>
+                      <span>العربية (AR)</span>
                     </button>
                     <button
                       onClick={() => setTargetLang('en')}
-                      className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                         targetLang === 'en'
                           ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      English
+                      <span className="text-sm">🇬🇧</span>
+                      <span>English (EN)</span>
                     </button>
                   </div>
                 </div>
-
               </div>
 
               {/* OCR Toggle */}

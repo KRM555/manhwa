@@ -44,7 +44,12 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
   const activeBubble = bubbles.find((b) => b.id === selectedBubbleId);
 
   const handleCopyAll = () => {
-    const text = bubbles.map((b) => `[${b.type.toUpperCase()}]\nOriginal: ${b.originalText}\nTranslated: ${b.translatedText}`).join('\n\n');
+    const text = bubbles
+      .map((b) => {
+        const typeStr = ((b as any).type || b.category || 'dialogue').toUpperCase();
+        return `[${typeStr}]\nOriginal: ${b.originalText}\nTranslated: ${b.translatedText}`;
+      })
+      .join('\n\n');
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast.success('All translations copied to clipboard!');
@@ -157,14 +162,14 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
       {/* Main Translation Canvas & Editor */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Manga Page Viewer with Overlay Bubbles */}
-        <div className={`lg:col-span-2 overflow-hidden border border-border rounded-3xl bg-zinc-950 p-4 flex items-center justify-center min-h-[500px]`}>
+        <div className="lg:col-span-2 overflow-hidden border border-border rounded-3xl bg-zinc-950 p-4 flex items-center justify-center min-h-[500px]">
           <div
             className={`relative transition-transform duration-200 ${
               viewMode === 'side-by-side' ? 'grid grid-cols-1 md:grid-cols-2 gap-4 w-full' : 'max-w-xl mx-auto'
             }`}
             style={{ transform: viewMode !== 'side-by-side' ? `scale(${zoom / 100})` : undefined, transformOrigin: 'top center' }}
           >
-            {/* Raw Original (shown in side-by-side or original mode) */}
+            {/* Raw Original */}
             {(viewMode === 'side-by-side' || viewMode === 'original') && (
               <div className="relative rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900">
                 <div className="absolute top-3 left-3 z-10">
@@ -190,6 +195,7 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
                 {bubbles.map((bubble) => {
                   const isSelected = bubble.id === selectedBubbleId;
                   const isArabic = config.targetLanguage === 'ar';
+                  const bubbleType = (bubble as any).type || bubble.category || 'dialogue';
 
                   return (
                     <div
@@ -202,7 +208,7 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
                         minHeight: `${bubble.height}%`,
                       }}
                       className={`absolute cursor-pointer transition-all duration-200 rounded-xl p-2 flex items-center justify-center text-center shadow-lg ${
-                        bubble.type === 'sfx'
+                        bubbleType === 'sfx'
                           ? 'bg-amber-400/90 text-zinc-950 font-black italic border-2 border-amber-300'
                           : 'bg-white text-zinc-950 font-bold border-2 border-zinc-900'
                       } ${
@@ -287,7 +293,7 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
                             #{i + 1}: {b.translatedText}
                           </span>
                           <Badge variant="secondary" className="text-[10px] uppercase font-bold shrink-0">
-                            {b.type}
+                            {(b as any).type || b.category || 'dialogue'}
                           </Badge>
                         </button>
                       ))}

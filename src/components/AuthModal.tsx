@@ -34,13 +34,6 @@ export function AuthModal() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // جلب سجل المستخدم عند فتح النافذة
-  useEffect(() => {
-    if (isOpen && user) {
-      fetchUserHistory();
-    }
-  }, [isOpen, user]);
-
   const fetchUserHistory = async () => {
     setLoadingHistory(true);
     const { data, error } = await supabase
@@ -53,6 +46,28 @@ export function AuthModal() {
     }
     setLoadingHistory(false);
   };
+
+  // جلب السجل وتحديثه لحظياً (Realtime) عند فتح النافذة
+  useEffect(() => {
+    if (isOpen && user) {
+      fetchUserHistory();
+
+      const channel = supabase
+        .channel('public:user_history')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'user_history' },
+          (payload) => {
+            setHistory((prev) => [payload.new as HistoryItem, ...prev]);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [isOpen, user]);
 
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });

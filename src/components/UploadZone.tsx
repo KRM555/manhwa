@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Image as ImageIcon, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Upload, Loader2, Sparkles, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UploadZoneProps {
@@ -11,36 +11,17 @@ interface UploadZoneProps {
   onStartProcessing?: () => void;
 }
 
-export async function processImageWithGeminiDirect(
+export async function extractTextWithGemini(
   imageBase64: string,
   apiKey: string,
   targetLang: string,
   isOcrOnly: boolean
 ) {
-  const systemInstruction = `You are an expert manga/webtoon OCR and translation tool. 
-Analyze the input image carefully. Locate all speech bubbles, text boxes, system windows, and sound effects (SFX).
-Extract all text in reading order (top-to-bottom).
-Return ONLY a valid JSON array of objects without any conversational text.`;
-
-  const prompt = isOcrOnly
-    ? `Extract all text elements. Return raw JSON format:
-[
-  {
-    "originalText": "text in comic",
-    "translatedText": "text in comic",
-    "category": "dialogue"
-  }
-]`
-    : `Extract all text elements and translate them into ${targetLang === 'ar' ? 'Arabic' : 'English'}. Return raw JSON format:
-[
-  {
-    "originalText": "text in comic",
-    "translatedText": "translated text",
-    "category": "dialogue"
-  }
-]`;
-
   const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+  const promptText = isOcrOnly
+    ? `You are an OCR tool for manga/comics. Extract all texts in reading order. Return ONLY a JSON array with objects like: [{"originalText": "...", "translatedText": "...", "category": "dialogue"}]`
+    : `You are a manga translation tool. Extract and translate all texts into ${targetLang === 'ar' ? 'Arabic' : 'English'}. Return ONLY a JSON array with objects like: [{"originalText": "...", "translatedText": "...", "category": "dialogue"}]`;
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -48,44 +29,34 @@ Return ONLY a valid JSON array of objects without any conversational text.`;
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemInstruction }]
-        },
         contents: [
           {
             parts: [
-              { text: prompt },
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: cleanBase64,
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.1,
-        },
-      }),
+              { text: promptText },
+              { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
+            ]
+          }
+        ]
+      })
     }
   );
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `فشل الاتصال: ${response.statusText}`);
+    const errorRes = await response.json().catch(() => ({}));
+    throw new Error(errorRes.error?.message || 'فشل الاتصال بـ Gemini API');
   }
 
-  const data = await response.json();
-  let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  const resData = await response.json();
+  let textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
   
-  // تنظيف النص من صيغ markdown markdown ```json ``` التي تسبب فشل Parsing
-  rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-
+  // تنظيف الـ Markdown JSON
+  textResult = textResult.replace(/```json/gi, '').replace(/```/g, '').trim();
+  
   try {
-    return JSON.parse(rawText);
-  } catch (e) {
-    console.error('Failed to parse JSON response:', rawText);
+    const parsed = JSON.parse(textResult);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Failed to parse response:', textResult);
     return [];
   }
 }
@@ -94,11 +65,9 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
   apiKey,
   targetLang,
   isOcrOnly,
-  typerRules,
   onPagesLoaded,
   onStartProcessing,
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,64 +76,56 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
     if (!files || files.length === 0) return;
 
     if (!apiKey) {
-      toast.error('يرجى إدخال Gemini API Key أولاً لمعالجة الصور!');
+      toast.error('برجاء كتابة الـ API Key أولاً!');
       return;
     }
 
-    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    
-    if (imageFiles.length === 0) {
-      toast.error('يرجى رفع صور فقط (PNG, JPG, WEBP)');
-      return;
-    }
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
 
     setIsLoading(true);
     if (onStartProcessing) onStartProcessing();
 
     try {
-      const processedPages = [];
+      const pages = [];
 
-      for (let index = 0; index < imageFiles.length; index++) {
-        const file = imageFiles[index];
-        setStatusText(`جاري استخراج وترجمة الصفحة (${index + 1}/${imageFiles.length})...`);
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        setStatusText(`جاري تحليل الصورة واستخراج النصوص (${i + 1}/${imageFiles.length})...`);
 
-        const base64Data = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(file);
+        const base64 = await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onload = (e) => resolve(e.target?.result as string);
+          r.readAsDataURL(file);
         });
 
-        let extractedItems: any[] = [];
+        let items: any[] = [];
         try {
-          const apiResult = await processImageWithGeminiDirect(base64Data, apiKey, targetLang, isOcrOnly);
-          
-          if (Array.isArray(apiResult)) {
-            extractedItems = apiResult.map((item: any, idx: number) => ({
-              id: `item_${Date.now()}_${idx}`,
-              originalText: item.originalText || '',
-              translatedText: item.translatedText || item.originalText || '',
-              category: item.category || 'dialogue',
-            }));
-          }
-        } catch (err: any) {
-          console.error('API Error:', err);
-          toast.error(err.message || `تعذر استخراج النصوص للصورة ${file.name}`);
+          const rawItems = await extractTextWithGemini(base64, apiKey, targetLang, isOcrOnly);
+          items = rawItems.map((item: any, idx: number) => ({
+            id: `item_${Date.now()}_${idx}`,
+            originalText: item.originalText || '',
+            translatedText: item.translatedText || item.originalText || '',
+            category: item.category || 'dialogue',
+          }));
+        } catch (e: any) {
+          console.error(e);
+          toast.error(e.message || 'حدث خطأ أثناء الاستخراج');
         }
 
-        processedPages.push({
-          id: `page_${Date.now()}_${index}`,
+        pages.push({
+          id: `page_${Date.now()}_${i}`,
           name: file.name,
-          imageUrl: base64Data,
-          items: extractedItems,
+          imageUrl: base64,
+          items: items,
           status: 'completed'
         });
       }
 
-      toast.success(`تمت معالجة وترجمة ${processedPages.length} صورة بنجاح!`);
-      onPagesLoaded(processedPages);
-    } catch (error) {
-      console.error('Error processing uploaded images:', error);
-      toast.error('حدث خطأ أثناء معالجة الصور.');
+      toast.success('تم رفع الصورة واستخراج النصوص!');
+      onPagesLoaded(pages);
+    } catch (err) {
+      toast.error('حدث خطأ غير متوقع');
     } finally {
       setIsLoading(false);
       setStatusText('');
@@ -183,27 +144,18 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       />
 
       <div
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-        onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileSelect(e.dataTransfer.files); }}
         onClick={() => !isLoading && fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 relative overflow-hidden group ${
-          isDragging ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 hover:border-orange-500/50 bg-slate-900/40'
-        } ${isLoading ? 'opacity-75 pointer-events-none' : ''}`}
+        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all bg-slate-900/40 border-slate-800 hover:border-orange-500/50 ${
+          isLoading ? 'opacity-75 pointer-events-none' : ''
+        }`}
       >
         <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="w-16 h-16 bg-orange-500/20 rounded-2xl border border-orange-500/30 flex items-center justify-center text-orange-400 shadow-xl">
-            {isLoading ? <Loader2 className="w-8 h-8 animate-spin text-orange-400" /> : <Upload className="w-8 h-8" />}
+          <div className="w-16 h-16 bg-orange-500/20 rounded-2xl border border-orange-500/30 flex items-center justify-center text-orange-400">
+            {isLoading ? <Loader2 className="w-8 h-8 animate-spin" /> : <Upload className="w-8 h-8" />}
           </div>
-
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-slate-200">
-              {isLoading ? statusText : 'اضغط هنا أو اسحب الصور وانسخها إلى هنا'}
-            </h3>
-            <p className="text-xs text-slate-400">
-              يدعم فصول المانوا والمانهوا بصيغ (PNG, JPG, WEBP)
-            </p>
-          </div>
+          <h3 className="text-base font-bold text-slate-200">
+            {isLoading ? statusText : 'اضغط هنا أو اسحب الصور للرفع والاستخراج الفوري'}
+          </h3>
         </div>
       </div>
     </div>

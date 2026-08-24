@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { TranslationConfig, SampleManga } from '@/types/manga';
-import { ArrowLeft, Download, Save, Sparkles, Key, RefreshCw } from 'lucide-react';
+import { 
+  ArrowLeft, Download, Save, Sparkles, Key, RefreshCw, 
+  Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,64 +20,112 @@ export interface ExtractedText {
   category: string;
 }
 
+interface ImageItem {
+  id: string;
+  url: string;
+  name: string;
+}
+
 const CATEGORIES = [
-  { value: 'dialogue', label: 'حوار (Dialogue)' },
-  { value: 'thought', label: 'أفكار (Thought)' },
-  { value: 'scream', label: 'صراخ (Scream)' },
-  { value: 'whisper', label: 'همس (Whisper)' },
-  { value: 'anger', label: 'غضب (Anger)' },
-  { value: 'fear', label: 'خوف (Fear)' },
-  { value: 'tension', label: 'توتر (Tension)' },
-  { value: 'pleasure', label: 'متعة (Pleasure)' },
-  { value: 'monster', label: 'وحش (Monster)' },
-  { value: 'system', label: 'نظام (System)' },
-  { value: 'phone', label: 'هاتف (Phone)' },
-  { value: 'message', label: 'رسالة (Message)' },
-  { value: 'sfx', label: 'مؤثر صوتي (SFX)' },
-  { value: 'narrator', label: 'راوي (Narrator)' },
-  { value: 'other', label: 'أخرى (Other)' },
+  { value: 'dialogue', label: { ar: 'حوار (Dialogue)', en: 'Dialogue' } },
+  { value: 'thought', label: { ar: 'أفكار (Thought)', en: 'Thought' } },
+  { value: 'scream', label: { ar: 'صراخ (Scream)', en: 'Scream' } },
+  { value: 'whisper', label: { ar: 'همس (Whisper)', en: 'Whisper' } },
+  { value: 'anger', label: { ar: 'غضب (Anger)', en: 'Anger' } },
+  { value: 'fear', label: { ar: 'خوف (Fear)', en: 'Fear' } },
+  { value: 'tension', label: 'توتر (Tension)', en: 'Tension' },
+  { value: 'pleasure', label: { ar: 'متعة (Pleasure)', en: 'Pleasure' } },
+  { value: 'monster', label: { ar: 'وحش (Monster)', en: 'Monster' } },
+  { value: 'system', label: { ar: 'نظام (System)', en: 'System' } },
+  { value: 'phone', label: { ar: 'هاتف (Phone)', en: 'Phone' } },
+  { value: 'message', label: { ar: 'رسالة (Message)', en: 'Message' } },
+  { value: 'sfx', label: { ar: 'مؤثر صوتي (SFX)', en: 'SFX' } },
+  { value: 'narrator', label: { ar: 'راوي (Narrator)', en: 'Narrator' } },
+  { value: 'other', label: { ar: 'أخرى (Other)', en: 'Other' } },
 ];
 
-// الموديلات المعتمدة رسمياً في REST API v1beta
+// الموديلات المطلوبة مع البدائل لضمان الاتصال
 const CANDIDATE_MODELS = [
-  'gemini-1.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
   'gemini-2.0-flash',
-  'gemini-1.5-pro',
+  'gemini-1.5-flash',
 ];
 
-// دالة تنسيق النص المترجم كـ Prefixes قبل النص طبقاً للرموز المطلوبة
+const UI_TEXT = {
+  ar: {
+    title: 'Manga Translator Studio',
+    subtitle: 'أداة استخراج وترجمة وتنسيق سكريبتات الويب تون والمانجا',
+    apiKeyPlaceholder: 'Gemini API Key (AIzaSy...)',
+    backToUpload: 'العودة للرفع',
+    reAnalyze: 'إعادة التحليل',
+    saveDraft: 'حفظ المسودة',
+    exportTxt: 'تصدير TXT المنسق',
+    pagePreview: 'معاينة الصفحة',
+    extractedTexts: 'النصوص المستخرجة',
+    originalText: 'النص الأصلي:',
+    translatedText: 'النص المترجم:',
+    noImage: 'لا توجد صورة محددة',
+    page: 'صفحة',
+    multiImageLimit: 'يمكنك إضافة حتى 10 صور',
+    paragraph: 'فقرة',
+    selectImageFirst: 'الرجاء اختيار صورة واحدة على الأقل',
+    enterApiKey: 'يرجى إدخال مفتاح Gemini API Key أولاً',
+    analyzing: 'جاري معالجة واستخراج النصوص بواسطة Gemini...',
+    successExtract: 'تم استخراج وترجمة النصوص بنجاح!',
+    noItemsToExport: 'لا توجد نصوص لتصديرها',
+  },
+  en: {
+    title: 'Manga Translator Studio',
+    subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
+    apiKeyPlaceholder: 'Gemini API Key (AIzaSy...)',
+    backToUpload: 'Back to Upload',
+    reAnalyze: 'Re-analyze',
+    saveDraft: 'Save Draft',
+    exportTxt: 'Export Formatted TXT',
+    pagePreview: 'Page Preview',
+    extractedTexts: 'Extracted Texts',
+    originalText: 'Original Text:',
+    translatedText: 'Translated Text:',
+    noImage: 'No image selected',
+    page: 'Page',
+    multiImageLimit: 'You can upload up to 10 images',
+    paragraph: 'Block',
+    selectImageFirst: 'Please select at least one image',
+    enterApiKey: 'Please enter a valid Gemini API Key first',
+    analyzing: 'Processing and extracting text with Gemini...',
+    successExtract: 'Texts successfully extracted and translated!',
+    noItemsToExport: 'No texts available for export',
+  },
+};
+
 const formatTextByCategory = (text: string, category: string): string => {
   const cleanText = text.trim();
   switch (category) {
-    case 'dialogue':
-      return `"": ${cleanText}`;
-    case 'thought':
-      return `(): ${cleanText}`;
+    case 'dialogue': return `"": ${cleanText}`;
+    case 'thought': return `(): ${cleanText}`;
     case 'scream':
     case 'anger':
-    case 'fear':
-      return `<>: ${cleanText}`;
-    case 'system':
-      return `[]: ${cleanText}`;
+    case 'fear': return `<>: ${cleanText}`;
+    case 'system': return `[]: ${cleanText}`;
     case 'phone':
-    case 'message':
-      return `**: ${cleanText}`;
-    case 'narrator':
-      return `NA: ${cleanText}`;
-    case 'sfx':
-      return `sfx: ${cleanText}`;
-    case 'whisper':
-      return `ST: ${cleanText}`;
-    default:
-      return cleanText;
+    case 'message': return `**: ${cleanText}`;
+    case 'narrator': return `NA: ${cleanText}`;
+    case 'sfx': return `sfx: ${cleanText}`;
+    case 'whisper': return `ST: ${cleanText}`;
+    default: return cleanText;
   }
 };
 
 export default function Index() {
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+
+  // إعدادات اللغة والوضع الليلي
+  const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
   const [apiKey, setApiKey] = useState<string>(
     import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || ''
@@ -88,25 +139,44 @@ export default function Index() {
 
   const [items, setItems] = useState<ExtractedText[]>([]);
 
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const t = UI_TEXT[lang];
+  const activeImage = images[activeImageIndex] || null;
+
   const handleImageSelected = (url: string, name: string, sampleData?: SampleManga) => {
-    setImagePreview(url);
-    setFileName(name);
+    if (images.length >= 10) {
+      toast.error(t.multiImageLimit);
+      return;
+    }
+
+    const newImage: ImageItem = { id: `img_${Date.now()}_${Math.random()}`, url, name };
+    setImages((prev) => [...prev, newImage]);
+    setActiveImageIndex(images.length);
 
     if (sampleData && (sampleData as any).items) {
       setItems((sampleData as any).items);
-    } else {
-      setItems([]);
     }
   };
 
-  const handleClearImage = () => {
-    setImagePreview(null);
-    setFileName(null);
-    setItems([]);
+  const handleRemoveImage = (index: number) => {
+    const updated = images.filter((_, i) => i !== index);
+    setImages(updated);
+    if (activeImageIndex >= updated.length) {
+      setActiveImageIndex(Math.max(0, updated.length - 1));
+    }
   };
 
-  const handleConfigChange = (updated: Partial<TranslationConfig>) => {
-    setConfig((prev) => ({ ...prev, ...updated }));
+  const handleClearAllImages = () => {
+    setImages([]);
+    setActiveImageIndex(0);
+    setItems([]);
   };
 
   const handleSaveApiKey = (key: string) => {
@@ -116,21 +186,20 @@ export default function Index() {
 
   const handleSaveDraft = () => {
     if (items.length === 0) {
-      toast.error('لا توجد نصوص لحفظها كمسودة');
+      toast.error(t.noItemsToExport);
       return;
     }
     localStorage.setItem('manga_draft_items', JSON.stringify(items));
-    toast.success('تم حفظ المسودة بنجاح!');
+    toast.success(lang === 'ar' ? 'تم حفظ المسودة!' : 'Draft saved!');
   };
 
   const handleExport = () => {
     if (items.length === 0) {
-      toast.error('لا توجد نصوص لتصديرها');
+      toast.error(t.noItemsToExport);
       return;
     }
 
-    let fileContent = `Page 1\n\n`;
-
+    let fileContent = `Page ${activeImageIndex + 1}\n\n`;
     fileContent += items
       .map((item) => formatTextByCategory(item.translatedText, item.category))
       .join('\n\n');
@@ -139,40 +208,40 @@ export default function Index() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const cleanName = fileName ? fileName.replace(/\.[^/.]+$/, '') : 'manga_page';
+    const cleanName = activeImage?.name ? activeImage.name.replace(/\.[^/.]+$/, '') : 'manga_page';
     link.download = `${cleanName}_script.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success('تم تصدير ملف النصوص المنسق بنجاح!');
+    toast.success(lang === 'ar' ? 'تم التصدير بنجاح!' : 'Export successful!');
   };
 
   const handleAnalyze = async () => {
-    if (!imagePreview) {
-      toast.error('الرجاء اختيار صورة أولاً');
+    if (!activeImage) {
+      toast.error(t.selectImageFirst);
       return;
     }
 
     if (!apiKey || apiKey.trim() === '') {
-      toast.error('يرجى إدخال مفتاح Gemini API Key أولاً (يبدأ بـ AIzaSy)');
+      toast.error(t.enterApiKey);
       return;
     }
 
     setIsAnalyzing(true);
-    toast.info('جاري معالجة واستخراج النصوص بواسطة Gemini...');
+    toast.info(t.analyzing);
 
-    const mimeTypeMatch = imagePreview.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+    const mimeTypeMatch = activeImage.url.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
-    const base64Data = imagePreview.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+    const base64Data = activeImage.url.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
     const promptText = `
-      أنت مترجم مانجا وويب تون محترف لخلق سكريبتات تبييض سريعة.
-      قم بتحليل الصورة واستخراج كافة النصوص بالترتيب من الأعلى للأسفل.
-      صنّف كل عنصر إلى إحدى الفئات التالية:
+      You are a professional webtoon/manga translator and typesetter script assistant.
+      Extract all texts from the image in reading order top to bottom.
+      Categorize each block into one of these types:
       (dialogue, thought, scream, whisper, anger, fear, tension, pleasure, monster, system, phone, message, sfx, narrator, other).
-      ترجم كافة النصوص إلى اللغة العربية بدقة ودون تحريف.
+      Translate all extracted texts to ${config.targetLanguage === 'ar' ? 'Arabic' : 'English'} accurately.
     `;
 
     let success = false;
@@ -198,7 +267,7 @@ export default function Index() {
                 responseMimeType: 'application/json',
                 responseSchema: {
                   type: 'ARRAY',
-                  description: 'قائمة الفقرات المستخرجة',
+                  description: 'List of extracted manga dialogue items',
                   items: {
                     type: 'OBJECT',
                     properties: {
@@ -232,7 +301,7 @@ export default function Index() {
           }));
 
           setItems(formattedItems);
-          toast.success(`تم استخراج وترجمة ${formattedItems.length} فقرة!`);
+          toast.success(t.successExtract);
           setView('results');
           success = true;
           break;
@@ -243,7 +312,7 @@ export default function Index() {
     }
 
     if (!success) {
-      toast.error(`تعذر استخراج النصوص: ${lastErrorMsg}`);
+      toast.error(`${lang === 'ar' ? 'تعذر استخراج النصوص' : 'Extraction failed'}: ${lastErrorMsg}`);
     }
 
     setIsAnalyzing(false);
@@ -256,45 +325,107 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto dir-rtl">
+    <div className={`min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto ${lang === 'ar' ? 'dir-rtl' : 'dir-ltr'}`}>
       {/* Header */}
       <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
-            Manga Translator Studio
+            {t.title}
           </h1>
-          <p className="text-xs text-muted-foreground">أداة استخراج وترجمة وتنسيق سكريبتات الويب تون</p>
+          <p className="text-xs text-muted-foreground">{t.subtitle}</p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Key className="w-4 h-4 text-orange-500 shrink-0" />
-          <Input
-            type="password"
-            placeholder="Gemini API Key (AIzaSy...)"
-            value={apiKey}
-            onChange={(e) => handleSaveApiKey(e.target.value)}
-            className="h-9 text-xs w-full sm:w-64 dir-ltr"
-          />
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Toggle Theme */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            title="Toggle Theme"
+          >
+            {isDarkMode ? <Sun className="w-4 h-4 text-orange-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+          </Button>
+
+          {/* Toggle Language */}
+          <Button
+            variant="outline"
+            className="h-9 gap-1 text-xs font-bold px-2.5"
+            onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+          >
+            <Languages className="w-4 h-4 text-orange-500" />
+            {lang === 'ar' ? 'English' : 'عربي'}
+          </Button>
+
+          {/* API Key Input */}
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+            <Key className="w-4 h-4 text-orange-500 shrink-0" />
+            <Input
+              type="password"
+              placeholder={t.apiKeyPlaceholder}
+              value={apiKey}
+              onChange={(e) => handleSaveApiKey(e.target.value)}
+              className="h-9 text-xs w-full sm:w-60 dir-ltr"
+            />
+          </div>
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Multi-Image Bar */}
+      {images.length > 0 && (
+        <div className="mb-6 p-3 bg-card border border-border rounded-xl flex items-center justify-between gap-3 overflow-x-auto">
+          <div className="flex items-center gap-2">
+            <Images className="w-4 h-4 text-orange-500" />
+            <span className="text-xs font-bold text-muted-foreground">
+              {t.page} ({images.length}/10):
+            </span>
+            <div className="flex gap-1.5 overflow-x-auto py-1">
+              {images.map((img, idx) => (
+                <button
+                  key={img.id}
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`relative px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                    activeImageIndex === idx
+                      ? 'bg-orange-600 text-white shadow-md'
+                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                  }`}
+                >
+                  #{idx + 1}
+                  <Trash2
+                    className="w-3 h-3 hover:text-red-400 ml-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveImage(idx);
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={handleClearAllImages} className="text-xs text-red-500 hover:text-red-600">
+            حذف الكل
+          </Button>
+        </div>
+      )}
+
+      {/* Main View Switcher */}
       {view === 'upload' ? (
         <UploadZone
-          imagePreview={imagePreview}
-          fileName={fileName}
+          imagePreview={activeImage?.url || null}
+          fileName={activeImage?.name || null}
           config={config}
           isAnalyzing={isAnalyzing}
           onImageSelected={handleImageSelected}
-          onClearImage={handleClearImage}
-          onConfigChange={handleConfigChange}
+          onClearImage={handleClearAllImages}
+          onConfigChange={(updated) => setConfig((prev) => ({ ...prev, ...updated }))}
           onAnalyze={handleAnalyze}
         />
       ) : (
         <div className="space-y-6">
+          {/* Top Actions Bar */}
           <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-2xl border border-border gap-3">
             <Button variant="outline" onClick={() => setView('upload')} className="gap-2 text-xs font-bold">
-              <ArrowLeft className="w-4 h-4" /> العودة للرفع
+              <ArrowLeft className="w-4 h-4" /> {t.backToUpload}
             </Button>
 
             <div className="flex items-center gap-2">
@@ -304,42 +435,66 @@ export default function Index() {
                 disabled={isAnalyzing}
                 className="gap-2 text-xs"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} /> إعادة التحليل
+                <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} /> {t.reAnalyze}
               </Button>
-              
+
               <Button variant="secondary" onClick={handleSaveDraft} className="gap-2 text-xs">
-                <Save className="w-4 h-4" /> حفظ المسودة
+                <Save className="w-4 h-4" /> {t.saveDraft}
               </Button>
 
               <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold">
-                <Download className="w-4 h-4" /> تصدير TXT المنسق
+                <Download className="w-4 h-4" /> {t.exportTxt}
               </Button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Image Preview Card */}
             <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
               <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
-                <span>معاينة الصفحة</span>
+                <span>{t.pagePreview} (#{activeImageIndex + 1})</span>
+                {images.length > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-6 w-6"
+                      disabled={activeImageIndex === 0}
+                      onClick={() => setActiveImageIndex((prev) => prev - 1)}
+                    >
+                      <ChevronRight className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-6 w-6"
+                      disabled={activeImageIndex === images.length - 1}
+                      onClick={() => setActiveImageIndex((prev) => prev + 1)}
+                    >
+                      <ChevronLeft className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
               <CardContent className="p-4 flex-1 overflow-y-auto flex justify-center items-start">
-                {imagePreview ? (
+                {activeImage ? (
                   <img
-                    src={imagePreview}
+                    src={activeImage.url}
                     alt="Manga Page"
                     className="w-full max-w-[450px] h-auto object-contain rounded-lg shadow-md"
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground m-auto">لا توجد صورة</p>
+                  <p className="text-sm text-muted-foreground m-auto">{t.noImage}</p>
                 )}
               </CardContent>
             </Card>
 
+            {/* Extracted Texts List */}
             <div className="space-y-4 h-[750px] overflow-y-auto pl-2">
               <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
                 <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-orange-500" />
-                  النصوص المستخرجة ({items.length})
+                  {t.extractedTexts} ({items.length})
                 </h3>
               </div>
 
@@ -347,7 +502,7 @@ export default function Index() {
                 <Card key={item.id} className="p-4 space-y-3 border-border rounded-xl shadow-sm hover:border-orange-500/30 transition-colors">
                   <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
                     <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
-                      فقرة #{idx + 1}
+                      {t.paragraph} #{idx + 1}
                     </span>
                     <Select
                       value={item.category}
@@ -359,7 +514,7 @@ export default function Index() {
                       <SelectContent>
                         {CATEGORIES.map((cat) => (
                           <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label}
+                            {typeof cat.label === 'string' ? cat.label : cat.label[lang]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -367,7 +522,7 @@ export default function Index() {
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-muted-foreground">النص الأصلي:</Label>
+                    <Label className="text-xs font-semibold text-muted-foreground">{t.originalText}</Label>
                     <Textarea
                       value={item.originalText}
                       onChange={(e) => updateItem(item.id, 'originalText', e.target.value)}
@@ -377,7 +532,7 @@ export default function Index() {
 
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold text-orange-600 dark:text-orange-400">
-                      النص المترجم:
+                      {t.translatedText}
                     </Label>
                     <Textarea
                       value={item.translatedText}

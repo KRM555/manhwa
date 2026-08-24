@@ -213,11 +213,21 @@ Return STRICTLY a raw JSON array of objects:
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                 
                 {/* API Key Section */}
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
-                    <KeyRound className="w-4 h-4 text-orange-400" />
-                    Gemini API Key:
-                  </label>
+<div className="md:col-span-2 space-y-2">
+  <div className="flex items-center justify-between">
+    <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
+      <KeyRound className="w-4 h-4 text-orange-400" />
+      Gemini API Key:
+    </label>
+    <a
+      href="https://aistudio.google.com/app/apikey"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[11px] text-orange-400 hover:text-orange-300 underline font-medium"
+    >
+      احصل على مفتاح مجاني من هنا ↗
+    </a>
+  </div>
                   <input
                     type="password"
                     className="w-full p-3.5 text-sm border border-slate-700 rounded-xl bg-slate-950/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 font-mono transition-all"

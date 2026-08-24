@@ -100,7 +100,7 @@ export const TyperItemCard: React.FC<TyperItemCardProps> = ({ item, onChange }) 
       {/* Translated Text Area with Automatic Bidi Direction */}
       <textarea
         className="w-full p-2 text-sm border rounded-md bg-background resize-y min-h-[70px] focus:outline-none focus:ring-1 focus:ring-primary"
-        dir={textDirection}
+        dir="auto"
         value={item.translatedText}
         onChange={(e) => onChange(e.target.value, item.category)}
       />

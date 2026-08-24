@@ -3,7 +3,7 @@ import { UploadZone } from '@/components/UploadZone';
 import { TranslationConfig, SampleManga } from '@/types/manga';
 import { 
   ArrowLeft, Download, Save, Sparkles, Key, RefreshCw, 
-  Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2 
+  Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2, HelpCircle, ExternalLink 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,7 +33,7 @@ const CATEGORIES = [
   { value: 'whisper', label: { ar: 'همس (Whisper)', en: 'Whisper' } },
   { value: 'anger', label: { ar: 'غضب (Anger)', en: 'Anger' } },
   { value: 'fear', label: { ar: 'خوف (Fear)', en: 'Fear' } },
-  { value: 'tension', label: 'توتر (Tension)', en: 'Tension' },
+  { value: 'tension', label: { ar: 'توتر (Tension)', en: 'Tension' } },
   { value: 'pleasure', label: { ar: 'متعة (Pleasure)', en: 'Pleasure' } },
   { value: 'monster', label: { ar: 'وحش (Monster)', en: 'Monster' } },
   { value: 'system', label: { ar: 'نظام (System)', en: 'System' } },
@@ -44,7 +44,7 @@ const CATEGORIES = [
   { value: 'other', label: { ar: 'أخرى (Other)', en: 'Other' } },
 ];
 
-// الموديلات المطلوبة مع البدائل لضمان الاتصال
+// الموديلات الخاصة بك كما هي تماماً بدون تغيير
 const CANDIDATE_MODELS = [
   'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
@@ -56,7 +56,9 @@ const UI_TEXT = {
   ar: {
     title: 'Manga Translator Studio',
     subtitle: 'أداة استخراج وترجمة وتنسيق سكريبتات الويب تون والمانجا',
-    apiKeyPlaceholder: 'Gemini API Key (AIzaSy...)',
+    apiLabel: 'مفتاح Gemini API:',
+    apiHint: 'احصل على مفتاح مجاني من Google AI Studio',
+    apiKeyPlaceholder: 'AIzaSy...',
     backToUpload: 'العودة للرفع',
     reAnalyze: 'إعادة التحليل',
     saveDraft: 'حفظ المسودة',
@@ -67,18 +69,21 @@ const UI_TEXT = {
     translatedText: 'النص المترجم:',
     noImage: 'لا توجد صورة محددة',
     page: 'صفحة',
-    multiImageLimit: 'يمكنك إضافة حتى 10 صور',
+    multiImageLimit: 'الحد الأقصى هو 10 صور فقط',
     paragraph: 'فقرة',
     selectImageFirst: 'الرجاء اختيار صورة واحدة على الأقل',
     enterApiKey: 'يرجى إدخال مفتاح Gemini API Key أولاً',
     analyzing: 'جاري معالجة واستخراج النصوص بواسطة Gemini...',
     successExtract: 'تم استخراج وترجمة النصوص بنجاح!',
     noItemsToExport: 'لا توجد نصوص لتصديرها',
+    clearAll: 'حذف الكل',
   },
   en: {
     title: 'Manga Translator Studio',
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
-    apiKeyPlaceholder: 'Gemini API Key (AIzaSy...)',
+    apiLabel: 'Gemini API Key:',
+    apiHint: 'Get free key from Google AI Studio',
+    apiKeyPlaceholder: 'AIzaSy...',
     backToUpload: 'Back to Upload',
     reAnalyze: 'Re-analyze',
     saveDraft: 'Save Draft',
@@ -89,13 +94,14 @@ const UI_TEXT = {
     translatedText: 'Translated Text:',
     noImage: 'No image selected',
     page: 'Page',
-    multiImageLimit: 'You can upload up to 10 images',
+    multiImageLimit: 'Maximum limit is 10 images',
     paragraph: 'Block',
     selectImageFirst: 'Please select at least one image',
     enterApiKey: 'Please enter a valid Gemini API Key first',
     analyzing: 'Processing and extracting text with Gemini...',
     successExtract: 'Texts successfully extracted and translated!',
     noItemsToExport: 'No texts available for export',
+    clearAll: 'Clear All',
   },
 };
 
@@ -123,7 +129,6 @@ export default function Index() {
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
-  // إعدادات اللغة والوضع الليلي
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
@@ -155,7 +160,6 @@ export default function Index() {
       toast.error(t.multiImageLimit);
       return;
     }
-
     const newImage: ImageItem = { id: `img_${Date.now()}_${Math.random()}`, url, name };
     setImages((prev) => [...prev, newImage]);
     setActiveImageIndex(images.length);
@@ -163,6 +167,16 @@ export default function Index() {
     if (sampleData && (sampleData as any).items) {
       setItems((sampleData as any).items);
     }
+  };
+
+  const handleMultipleImagesSelected = (newImages: { url: string; name: string }[]) => {
+    const formatted = newImages.map((img) => ({
+      id: `img_${Date.now()}_${Math.random()}`,
+      url: img.url,
+      name: img.name,
+    }));
+    setImages((prev) => [...prev, ...formatted].slice(0, 10));
+    setActiveImageIndex(0);
   };
 
   const handleRemoveImage = (index: number) => {
@@ -325,22 +339,22 @@ export default function Index() {
   };
 
   return (
-    <div className={`min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto ${lang === 'ar' ? 'dir-rtl' : 'dir-ltr'}`}>
+    <div className={`min-h-screen bg-background text-foreground p-4 sm:p-6 w-full max-w-6xl mx-auto ${lang === 'ar' ? 'dir-rtl' : 'dir-ltr'}`}>
       {/* Header */}
-      <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
+      <header className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
             {t.title}
           </h1>
-          <p className="text-xs text-muted-foreground">{t.subtitle}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t.subtitle}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {/* Toggle Theme */}
           <Button
             variant="outline"
             size="icon"
-            className="h-9 w-9"
+            className="h-9 w-9 rounded-xl"
             onClick={() => setIsDarkMode(!isDarkMode)}
             title="Toggle Theme"
           >
@@ -350,33 +364,46 @@ export default function Index() {
           {/* Toggle Language */}
           <Button
             variant="outline"
-            className="h-9 gap-1 text-xs font-bold px-2.5"
+            className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl"
             onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
           >
             <Languages className="w-4 h-4 text-orange-500" />
             {lang === 'ar' ? 'English' : 'عربي'}
           </Button>
 
-          {/* API Key Input */}
-          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
-            <Key className="w-4 h-4 text-orange-500 shrink-0" />
+          {/* API Key Box with Explanation */}
+          <div className="flex flex-col gap-1 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <span className="text-[11px] font-bold text-muted-foreground">{t.apiLabel}</span>
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-orange-500 hover:underline flex items-center gap-0.5 ml-auto"
+                title={t.apiHint}
+              >
+                {lang === 'ar' ? 'جلب مفتاح مجاني' : 'Get Free Key'}
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            </div>
             <Input
               type="password"
               placeholder={t.apiKeyPlaceholder}
               value={apiKey}
               onChange={(e) => handleSaveApiKey(e.target.value)}
-              className="h-9 text-xs w-full sm:w-60 dir-ltr"
+              className="h-9 text-xs w-full sm:w-64 dir-ltr rounded-xl"
             />
           </div>
         </div>
       </header>
 
-      {/* Multi-Image Bar */}
+      {/* Multi-Image Navigation Bar */}
       {images.length > 0 && (
-        <div className="mb-6 p-3 bg-card border border-border rounded-xl flex items-center justify-between gap-3 overflow-x-auto">
+        <div className="mb-6 p-3 bg-card border border-border rounded-2xl flex items-center justify-between gap-3 overflow-x-auto shadow-sm">
           <div className="flex items-center gap-2">
-            <Images className="w-4 h-4 text-orange-500" />
-            <span className="text-xs font-bold text-muted-foreground">
+            <Images className="w-4 h-4 text-orange-500 shrink-0" />
+            <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">
               {t.page} ({images.length}/10):
             </span>
             <div className="flex gap-1.5 overflow-x-auto py-1">
@@ -384,7 +411,7 @@ export default function Index() {
                 <button
                   key={img.id}
                   onClick={() => setActiveImageIndex(idx)}
-                  className={`relative px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                  className={`relative px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
                     activeImageIndex === idx
                       ? 'bg-orange-600 text-white shadow-md'
                       : 'bg-muted hover:bg-muted/80 text-foreground'
@@ -392,7 +419,7 @@ export default function Index() {
                 >
                   #{idx + 1}
                   <Trash2
-                    className="w-3 h-3 hover:text-red-400 ml-1"
+                    className="w-3 h-3 hover:text-red-400"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemoveImage(idx);
@@ -402,8 +429,8 @@ export default function Index() {
               ))}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleClearAllImages} className="text-xs text-red-500 hover:text-red-600">
-            حذف الكل
+          <Button variant="ghost" size="sm" onClick={handleClearAllImages} className="text-xs text-red-500 hover:text-red-600 font-bold shrink-0">
+            {t.clearAll}
           </Button>
         </div>
       )}
@@ -416,15 +443,17 @@ export default function Index() {
           config={config}
           isAnalyzing={isAnalyzing}
           onImageSelected={handleImageSelected}
+          onMultipleImagesSelected={handleMultipleImagesSelected}
           onClearImage={handleClearAllImages}
           onConfigChange={(updated) => setConfig((prev) => ({ ...prev, ...updated }))}
           onAnalyze={handleAnalyze}
+          lang={lang}
         />
       ) : (
         <div className="space-y-6">
-          {/* Top Actions Bar */}
+          {/* Action Bar */}
           <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-2xl border border-border gap-3">
-            <Button variant="outline" onClick={() => setView('upload')} className="gap-2 text-xs font-bold">
+            <Button variant="outline" onClick={() => setView('upload')} className="gap-2 text-xs font-bold rounded-xl">
               <ArrowLeft className="w-4 h-4" /> {t.backToUpload}
             </Button>
 
@@ -433,24 +462,24 @@ export default function Index() {
                 variant="ghost"
                 onClick={handleAnalyze}
                 disabled={isAnalyzing}
-                className="gap-2 text-xs"
+                className="gap-2 text-xs font-bold rounded-xl"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} /> {t.reAnalyze}
               </Button>
 
-              <Button variant="secondary" onClick={handleSaveDraft} className="gap-2 text-xs">
+              <Button variant="secondary" onClick={handleSaveDraft} className="gap-2 text-xs font-bold rounded-xl">
                 <Save className="w-4 h-4" /> {t.saveDraft}
               </Button>
 
-              <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold">
+              <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold rounded-xl">
                 <Download className="w-4 h-4" /> {t.exportTxt}
               </Button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Image Preview Card */}
-            <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
+            {/* Image Preview Panel */}
+            <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[700px]">
               <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
                 <span>{t.pagePreview} (#{activeImageIndex + 1})</span>
                 {images.length > 1 && (
@@ -458,7 +487,7 @@ export default function Index() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-6 w-6 rounded-md"
                       disabled={activeImageIndex === 0}
                       onClick={() => setActiveImageIndex((prev) => prev - 1)}
                     >
@@ -467,7 +496,7 @@ export default function Index() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-6 w-6 rounded-md"
                       disabled={activeImageIndex === images.length - 1}
                       onClick={() => setActiveImageIndex((prev) => prev + 1)}
                     >
@@ -481,7 +510,7 @@ export default function Index() {
                   <img
                     src={activeImage.url}
                     alt="Manga Page"
-                    className="w-full max-w-[450px] h-auto object-contain rounded-lg shadow-md"
+                    className="w-full max-w-[480px] h-auto object-contain rounded-lg shadow-md"
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground m-auto">{t.noImage}</p>
@@ -490,10 +519,10 @@ export default function Index() {
             </Card>
 
             {/* Extracted Texts List */}
-            <div className="space-y-4 h-[750px] overflow-y-auto pl-2">
-              <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
-                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-orange-500" />
+            <div className="space-y-4 h-[700px] overflow-y-auto pl-2">
+              <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/50">
+                <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-orange-500" />
                   {t.extractedTexts} ({items.length})
                 </h3>
               </div>
@@ -526,7 +555,7 @@ export default function Index() {
                     <Textarea
                       value={item.originalText}
                       onChange={(e) => updateItem(item.id, 'originalText', e.target.value)}
-                      className="min-h-[50px] text-sm dir-ltr bg-muted/20"
+                      className="min-h-[50px] text-sm dir-ltr bg-muted/20 rounded-lg"
                     />
                   </div>
 
@@ -537,7 +566,7 @@ export default function Index() {
                     <Textarea
                       value={item.translatedText}
                       onChange={(e) => updateItem(item.id, 'translatedText', e.target.value)}
-                      className="min-h-[50px] text-sm font-medium bg-card"
+                      className="min-h-[50px] text-sm font-medium bg-card rounded-lg"
                     />
                   </div>
                 </Card>

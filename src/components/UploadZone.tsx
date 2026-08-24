@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Loader2, Sparkles, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UploadZoneProps {
   apiKey: string;
   targetLang: string;
   isOcrOnly: boolean;
-  typerRules: any[];
+  typerRules?: any[];
   onPagesLoaded: (pages: any[]) => void;
   onStartProcessing?: () => void;
 }
@@ -20,11 +20,12 @@ export async function extractTextWithGemini(
   const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
   const promptText = isOcrOnly
-    ? `You are an OCR tool for manga/comics. Extract all texts in reading order. Return ONLY a JSON array with objects like: [{"originalText": "...", "translatedText": "...", "category": "dialogue"}]`
-    : `You are a manga translation tool. Extract and translate all texts into ${targetLang === 'ar' ? 'Arabic' : 'English'}. Return ONLY a JSON array with objects like: [{"originalText": "...", "translatedText": "...", "category": "dialogue"}]`;
+    ? `You are an OCR tool for manga/comics. Extract all text elements in reading order. Return ONLY a valid JSON array of objects without markdown formatting: [{"originalText": "text", "translatedText": "text", "category": "dialogue"}]`
+    : `You are a manga translation tool. Extract and translate all text elements into ${targetLang === 'ar' ? 'Arabic' : 'English'}. Return ONLY a valid JSON array of objects without markdown formatting: [{"originalText": "text", "translatedText": "translated text", "category": "dialogue"}]`;
 
+  // استخدام الرابط الرسمي المباشر لـ gemini-1.5-flash
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,30 +34,35 @@ export async function extractTextWithGemini(
           {
             parts: [
               { text: promptText },
-              { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
-            ]
-          }
-        ]
-      })
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: cleanBase64,
+                },
+              },
+            ],
+          },
+        ],
+      }),
     }
   );
 
   if (!response.ok) {
     const errorRes = await response.json().catch(() => ({}));
-    throw new Error(errorRes.error?.message || 'فشل الاتصال بـ Gemini API');
+    throw new Error(errorRes.error?.message || `فشل الاتصال بـ Gemini API (${response.status})`);
   }
 
   const resData = await response.json();
   let textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
   
-  // تنظيف الـ Markdown JSON
+  // تنظيف النص من أقواس الـ Markdown
   textResult = textResult.replace(/```json/gi, '').replace(/```/g, '').trim();
   
   try {
     const parsed = JSON.parse(textResult);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    console.error('Failed to parse response:', textResult);
+    console.error('Failed to parse Gemini response:', textResult);
     return [];
   }
 }
@@ -76,15 +82,22 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
     if (!files || files.length === 0) return;
 
     if (!apiKey) {
-      toast.error('برجاء كتابة الـ API Key أولاً!');
+      toast.error('برجاء كتابة الـ API Key الخاص بـ Gemini أولاً!');
       return;
     }
 
     const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-    if (imageFiles.length === 0) return;
+    if (imageFiles.length === 0) {
+      toast.error('يرجى اختيار صور فقط');
+      return;
+    }
 
     setIsLoading(true);
-    if (onStartProcessing) onStartProcessing();
+
+    // التحقق من وجود الدالة قبل استدعائها لمنع الـ TypeError
+    if (typeof onStartProcessing === 'function') {
+      onStartProcessing();
+    }
 
     try {
       const pages = [];
@@ -110,7 +123,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
           }));
         } catch (e: any) {
           console.error(e);
-          toast.error(e.message || 'حدث خطأ أثناء الاستخراج');
+          toast.error(e.message || 'حدث خطأ أثناء الاتصال بالذكاء الاصطناعي');
         }
 
         pages.push({
@@ -122,10 +135,10 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
         });
       }
 
-      toast.success('تم رفع الصورة واستخراج النصوص!');
+      toast.success('تمت العملية بنجاح!');
       onPagesLoaded(pages);
     } catch (err) {
-      toast.error('حدث خطأ غير متوقع');
+      toast.error('حدث خطأ غير متوقع أثناء رفع الملفات');
     } finally {
       setIsLoading(false);
       setStatusText('');

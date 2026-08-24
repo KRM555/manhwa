@@ -5,7 +5,8 @@ import {
   ArrowLeft, Download, Sparkles, Key, RefreshCw, 
   Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2,
   ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
-  Copy, Check, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus
+  Copy, Check, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
+  BookOpen, Eye, EyeOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +30,7 @@ export interface ExtractedText {
   originalText: string;
   translatedText: string;
   category: string;
+  topPercent?: number; // لإسناد موقع النص تقريبياً على الصورة
 }
 
 interface ImageItem {
@@ -42,6 +44,12 @@ export interface TagRule {
   label: string;
   prefix: string;
   suffix: string;
+}
+
+export interface GlossaryItem {
+  id: string;
+  original: string;
+  translation: string;
 }
 
 const DEFAULT_TAGS: TagRule[] = [
@@ -67,7 +75,6 @@ const UI_TEXT = {
   ar: {
     subtitle: 'أداة استخراج وترجمة وتنسيق سكريبتات الويب تون والمانجا',
     apiLabel: 'مفتاح Gemini API:',
-    apiHint: 'احصل على مفتاح مجاني من Google AI Studio',
     apiKeyPlaceholder: 'AIzaSy...',
     backToUpload: 'العودة للرفع',
     reAnalyze: 'إعادة التحليل',
@@ -91,11 +98,11 @@ const UI_TEXT = {
     successExtract: 'تم استخراج النصوص بنجاح!',
     noItemsToExport: 'لا توجد نصوص لتصديرها لهذه الصفحة',
     clearAll: 'حذف الكل',
-    tagSettings: 'إعدادات العلامات والتنسيق',
+    tagSettings: 'إعدادات العلامات',
     addNewTag: 'إضافة علامة جديدة',
     tagName: 'اسم العلامة',
-    tagPrefix: 'البادئة (Prefix)',
-    tagSuffix: 'اللاحقة (Suffix)',
+    tagPrefix: 'البادئة',
+    tagSuffix: 'اللاحقة',
     add: 'إضافة',
     deleteTag: 'حذف العلامة',
     resetDefaultTags: 'استعادة العلامات الافتراضية',
@@ -108,11 +115,15 @@ const UI_TEXT = {
     replacePlaceholder: 'استبدال بـ...',
     replaceCurrentPage: 'في هذه الصفحة',
     replaceAllPages: 'في كل الصفحات',
+    glossaryTitle: 'قاموس المصطلحات والأسماء',
+    origTerm: 'الاسم/المصطلح الأصلي',
+    transTerm: 'الترجمة المعتمدة',
+    addGlossary: 'إضافة للقاموس',
+    visualOverlay: 'المعاينة البصرية النصية',
   },
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
     apiLabel: 'Gemini API Key:',
-    apiHint: 'Get free key from Google AI Studio',
     apiKeyPlaceholder: 'AIzaSy...',
     backToUpload: 'Back to Upload',
     reAnalyze: 'Re-analyze',
@@ -136,7 +147,7 @@ const UI_TEXT = {
     successExtract: 'Texts successfully extracted!',
     noItemsToExport: 'No texts available to export',
     clearAll: 'Clear All',
-    tagSettings: 'Tag Formatting Settings',
+    tagSettings: 'Tag Formatting',
     addNewTag: 'Add Custom Tag',
     tagName: 'Tag Name',
     tagPrefix: 'Prefix',
@@ -153,6 +164,11 @@ const UI_TEXT = {
     replacePlaceholder: 'Replace with...',
     replaceCurrentPage: 'Current Page',
     replaceAllPages: 'All Pages',
+    glossaryTitle: 'Character & Term Glossary',
+    origTerm: 'Original Name/Term',
+    transTerm: 'Approved Translation',
+    addGlossary: 'Add to Glossary',
+    visualOverlay: 'Visual Text Overlay',
   },
 };
 
@@ -188,27 +204,38 @@ export default function Index() {
     return saved ? JSON.parse(saved) : DEFAULT_TAGS;
   });
 
+  // حالة القاموس (Glossary)
+  const [glossary, setGlossary] = useState<GlossaryItem[]>(() => {
+    const saved = localStorage.getItem('manga_glossary');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newGlossaryOrig, setNewGlossaryOrig] = useState('');
+  const [newGlossaryTrans, setNewGlossaryTrans] = useState('');
+
+  // حالة التمييز والمعاينة البصرية
+  const [showOverlay, setShowOverlay] = useState<boolean>(false);
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
   const [newTagLabel, setNewTagLabel] = useState('');
   const [newTagPrefix, setNewTagPrefix] = useState('');
   const [newTagSuffix, setNewTagSuffix] = useState('');
 
-  // حالة البحث والاستبدال
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
 
-  // حالة التمييز البصري
-  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
-
-  // حفظ كاش العمل التلقائي
   useEffect(() => {
     localStorage.setItem('custom_manga_tags', JSON.stringify(tags));
   }, [tags]);
 
   useEffect(() => {
+    localStorage.setItem('manga_glossary', JSON.stringify(glossary));
+  }, [glossary]);
+
+  useEffect(() => {
     try {
       localStorage.setItem('manga_studio_results', JSON.stringify(resultsMap));
     } catch (e) {
-      console.warn('Storage quota limit reached for results map');
+      console.warn('Storage limit reached for results');
     }
   }, [resultsMap]);
 
@@ -216,7 +243,7 @@ export default function Index() {
     try {
       localStorage.setItem('manga_studio_images', JSON.stringify(images));
     } catch (e) {
-      console.warn('Storage quota limit reached for images');
+      console.warn('Storage limit reached for images');
     }
   }, [images]);
 
@@ -295,22 +322,29 @@ export default function Index() {
     setNewTagLabel('');
     setNewTagPrefix('');
     setNewTagSuffix('');
-    toast.success(lang === 'ar' ? 'تمت إضافة العلامة الجديدة!' : 'Custom tag added!');
+    toast.success(lang === 'ar' ? 'تمت إضافة العلامة!' : 'Tag added!');
   };
 
   const handleDeleteTag = (index: number) => {
-    if (tags.length <= 1) {
-      toast.error(lang === 'ar' ? 'يجب الإبقاء على علامة واحدة على الأقل' : 'At least one tag must remain');
-      return;
-    }
-    const updated = tags.filter((_, i) => i !== index);
-    setTags(updated);
-    toast.success(lang === 'ar' ? 'تم حذف العلامة بنجاح' : 'Tag deleted successfully');
+    if (tags.length <= 1) return;
+    setTags(tags.filter((_, i) => i !== index));
   };
 
-  const handleResetDefaultTags = () => {
-    setTags(DEFAULT_TAGS);
-    toast.success(lang === 'ar' ? 'تمت استعادة العلامات الافتراضية' : 'Reset to default tags');
+  const handleAddGlossaryItem = () => {
+    if (!newGlossaryOrig.trim() || !newGlossaryTrans.trim()) return;
+    const item: GlossaryItem = {
+      id: `g_${Date.now()}`,
+      original: newGlossaryOrig.trim(),
+      translation: newGlossaryTrans.trim(),
+    };
+    setGlossary([...glossary, item]);
+    setNewGlossaryOrig('');
+    setNewGlossaryTrans('');
+    toast.success(lang === 'ar' ? 'تمت إضافة المصطلح للقاموس' : 'Glossary term added');
+  };
+
+  const handleDeleteGlossaryItem = (id: string) => {
+    setGlossary(glossary.filter((item) => item.id !== id));
   };
 
   const formatTextWithRules = (text: string, categoryVal: string): string => {
@@ -320,7 +354,6 @@ export default function Index() {
     return `${rule.prefix}${cleanText}${rule.suffix}`;
   };
 
-  // دالة نقل العناصر لأعلى/أسفل
   const handleMoveItem = (index: number, direction: 'up' | 'down') => {
     if (!activeImage) return;
     const items = [...currentItems];
@@ -334,7 +367,6 @@ export default function Index() {
     setResultsMap((prev) => ({ ...prev, [activeImage.id]: items }));
   };
 
-  // دالة النسخ السريع
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success(t.copied);
@@ -349,7 +381,6 @@ export default function Index() {
     toast.success(t.copied);
   };
 
-  // دالة البحث والاستبدال
   const handleFindAndReplace = (scope: 'current' | 'all') => {
     if (!findText.trim()) return;
 
@@ -391,12 +422,18 @@ export default function Index() {
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
     const base64Data = targetImg.url.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
 
+    const glossaryPrompt = glossary.length > 0
+      ? `Strictly use this Glossary for translated names/terms: ${glossary.map(g => `${g.original} => ${g.translation}`).join('; ')}.`
+      : '';
+
     const promptText = ocrOnly
-      ? `Extract all original texts from this manga page top to bottom without translation. Categorize each block into best matching category among existing tags.`
+      ? `Extract all original texts top to bottom. Estimate topPercent (0 to 100) position of each bubble on page. Categorize each block into best matching tag.`
       : `
-        Extract all texts from the image in reading order top to bottom.
+        Extract all texts from image in reading order (top to bottom).
+        Estimate topPercent (0 to 100) relative vertical position on page for each text bubble.
         Categorize each block into one of these types: (${tags.map(t => t.value).join(', ')}).
-        Translate all extracted texts to ${config.targetLanguage === 'ar' ? 'Arabic' : 'English'} accurately.
+        Translate all extracted texts to ${config.targetLanguage === 'ar' ? 'Arabic' : 'English'}.
+        ${glossaryPrompt}
       `;
 
     for (const model of CANDIDATE_MODELS) {
@@ -419,7 +456,7 @@ export default function Index() {
                 responseMimeType: 'application/json',
                 responseSchema: {
                   type: 'ARRAY',
-                  description: 'List of extracted manga dialogue items',
+                  description: 'Extracted manga blocks with vertical position estimates',
                   items: {
                     type: 'OBJECT',
                     properties: {
@@ -427,6 +464,7 @@ export default function Index() {
                       originalText: { type: 'STRING' },
                       translatedText: { type: 'STRING' },
                       category: { type: 'STRING' },
+                      topPercent: { type: 'NUMBER' },
                     },
                     required: ['id', 'originalText', 'translatedText', 'category'],
                   },
@@ -446,6 +484,7 @@ export default function Index() {
           return parsedItems.map((item, idx) => ({
             ...item,
             id: item.id || `item_${idx}_${Date.now()}`,
+            topPercent: item.topPercent ?? Math.min(95, Math.max(5, (idx + 1) * 15)),
             translatedText: ocrOnly ? item.originalText : item.translatedText,
           }));
         }
@@ -457,14 +496,8 @@ export default function Index() {
   };
 
   const handleAnalyzeCurrent = async (ocrOnly = false) => {
-    if (!activeImage) {
-      toast.error(t.selectImageFirst);
-      return;
-    }
-    if (!apiKey.trim()) {
-      toast.error(t.enterApiKey);
-      return;
-    }
+    if (!activeImage) return toast.error(t.selectImageFirst);
+    if (!apiKey.trim()) return toast.error(t.enterApiKey);
 
     setIsAnalyzing(true);
     toast.info(t.analyzing);
@@ -481,25 +514,16 @@ export default function Index() {
   };
 
   const handleAnalyzeAll = async (ocrOnly = false) => {
-    if (images.length === 0) {
-      toast.error(t.selectImageFirst);
-      return;
-    }
-    if (!apiKey.trim()) {
-      toast.error(t.enterApiKey);
-      return;
-    }
+    if (images.length === 0) return toast.error(t.selectImageFirst);
+    if (!apiKey.trim()) return toast.error(t.enterApiKey);
 
     setIsAnalyzing(true);
-    toast.info(lang === 'ar' ? `جاري تحليل جميع الصور (${images.length})...` : `Analyzing all ${images.length} images...`);
+    toast.info(lang === 'ar' ? `جاري تحليل كل الصور (${images.length})...` : `Analyzing all ${images.length} images...`);
 
     const newMap = { ...resultsMap };
-    for (let i = 0; i < images.length; i++) {
-      const img = images[i];
+    for (const img of images) {
       const res = await processGeminiRequest(img, ocrOnly);
-      if (res) {
-        newMap[img.id] = res;
-      }
+      if (res) newMap[img.id] = res;
     }
 
     setResultsMap(newMap);
@@ -513,7 +537,6 @@ export default function Index() {
     if (targetImages.length === 0) return;
 
     let fullOutput = '';
-
     targetImages.forEach((img) => {
       const realIndex = images.findIndex((i) => i.id === img.id);
       const itemsForImg = resultsMap[img.id] || [];
@@ -527,39 +550,24 @@ export default function Index() {
       }
     });
 
-    if (!fullOutput.trim()) {
-      toast.error(t.noItemsToExport);
-      return;
-    }
+    if (!fullOutput.trim()) return toast.error(t.noItemsToExport);
 
     const blob = new Blob([fullOutput], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     
-    let fileName = '';
-    if (textType === 'original') {
-      fileName = scope === 'current' 
-        ? `page_${activeImageIndex + 1}_ocr_original_script.txt` 
-        : `full_ocr_original_script.txt`;
-    } else {
-      fileName = scope === 'current' 
-        ? `page_${activeImageIndex + 1}_translated_script.txt` 
-        : `full_translated_script.txt`;
-    }
+    const fileName = textType === 'original'
+      ? (scope === 'current' ? `page_${activeImageIndex + 1}_ocr_original_script.txt` : `full_ocr_original_script.txt`)
+      : (scope === 'current' ? `page_${activeImageIndex + 1}_translated_script.txt` : `full_translated_script.txt`);
     
     link.download = fileName;
-    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success(
-      lang === 'ar'
-        ? `تم تصدير (${fileName}) بنجاح!`
-        : `Exported (${fileName}) successfully!`
-    );
+    toast.success(lang === 'ar' ? `تم تصدير (${fileName}) بنجاح!` : `Exported (${fileName}) successfully!`);
   };
 
   const updateItem = (id: string, field: keyof ExtractedText, value: string) => {
@@ -593,6 +601,61 @@ export default function Index() {
             {t.newProject}
           </Button>
 
+          {/* 📖 نافذة القاموس الموحد */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 dark:text-orange-400">
+                <BookOpen className="w-4 h-4 text-orange-500" />
+                {t.glossaryTitle} ({glossary.length})
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md rounded-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-base font-bold">{t.glossaryTitle}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {glossary.map((g) => (
+                    <div key={g.id} className="flex items-center justify-between bg-muted/40 p-2 rounded-lg text-xs">
+                      <span className="font-bold text-foreground">{g.original}</span>
+                      <span className="text-orange-500 font-bold">←</span>
+                      <span className="font-bold text-foreground">{g.translation}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteGlossaryItem(g.id)}
+                        className="h-6 w-6 text-red-500"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  {glossary.length === 0 && (
+                    <p className="text-xs text-center text-muted-foreground py-4">لا توجد مصطلحات أو أسماء محفوظة بعد</p>
+                  )}
+                </div>
+
+                <div className="border-t border-border pt-3 space-y-2">
+                  <Input
+                    placeholder={t.origTerm}
+                    value={newGlossaryOrig}
+                    onChange={(e) => setNewGlossaryOrig(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    placeholder={t.transTerm}
+                    value={newGlossaryTrans}
+                    onChange={(e) => setNewGlossaryTrans(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                  <Button onClick={handleAddGlossaryItem} className="w-full h-8 text-xs font-bold bg-orange-600 text-white">
+                    <Plus className="w-3.5 h-3.5 ml-1" /> {t.addGlossary}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* إعدادات العلامات */}
           <Dialog>
             <DialogTrigger asChild>
@@ -605,14 +668,8 @@ export default function Index() {
               <DialogHeader>
                 <DialogTitle className="text-base font-bold flex items-center justify-between">
                   <span>{t.tagSettings}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleResetDefaultTags}
-                    className="text-xs text-muted-foreground hover:text-orange-500 gap-1"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    {t.resetDefaultTags}
+                  <Button variant="ghost" size="sm" onClick={() => setTags(DEFAULT_TAGS)} className="text-xs text-muted-foreground hover:text-orange-500 gap-1">
+                    <RotateCcw className="w-3.5 h-3.5" /> {t.resetDefaultTags}
                   </Button>
                 </DialogTitle>
               </DialogHeader>
@@ -641,13 +698,7 @@ export default function Index() {
                         className="h-7 text-xs w-16"
                         placeholder="Suffix"
                       />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteTag(i)}
-                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/50 shrink-0"
-                        title={t.deleteTag}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(i)} className="h-7 w-7 text-red-500">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -655,26 +706,10 @@ export default function Index() {
                 </div>
 
                 <div className="border-t border-border pt-3 space-y-2">
-                  <Label className="text-xs font-bold">{t.addNewTag}</Label>
-                  <Input
-                    placeholder={t.tagName}
-                    value={newTagLabel}
-                    onChange={(e) => setNewTagLabel(e.target.value)}
-                    className="h-8 text-xs"
-                  />
+                  <Input placeholder={t.tagName} value={newTagLabel} onChange={(e) => setNewTagLabel(e.target.value)} className="h-8 text-xs" />
                   <div className="flex gap-2">
-                    <Input
-                      placeholder={t.tagPrefix}
-                      value={newTagPrefix}
-                      onChange={(e) => setNewTagPrefix(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                    <Input
-                      placeholder={t.tagSuffix}
-                      value={newTagSuffix}
-                      onChange={(e) => setNewTagSuffix(e.target.value)}
-                      className="h-8 text-xs"
-                    />
+                    <Input placeholder={t.tagPrefix} value={newTagPrefix} onChange={(e) => setNewTagPrefix(e.target.value)} className="h-8 text-xs" />
+                    <Input placeholder={t.tagSuffix} value={newTagSuffix} onChange={(e) => setNewTagSuffix(e.target.value)} className="h-8 text-xs" />
                   </div>
                   <Button onClick={handleAddCustomTag} className="w-full h-8 text-xs font-bold bg-orange-600 text-white">
                     <Plus className="w-3.5 h-3.5 ml-1" /> {t.add}
@@ -684,50 +719,26 @@ export default function Index() {
             </DialogContent>
           </Dialog>
 
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 rounded-xl"
-            onClick={() => setIsDarkMode(!isDarkMode)}
-          >
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setIsDarkMode(!isDarkMode)}>
             {isDarkMode ? <Sun className="w-4 h-4 text-orange-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
           </Button>
 
-          <Button
-            variant="outline"
-            className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl"
-            onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-          >
+          <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}>
             <Languages className="w-4 h-4 text-orange-500" />
             {lang === 'ar' ? 'English' : 'عربي'}
           </Button>
 
-          <div className="flex flex-col gap-1 w-full sm:w-auto">
-            <div className="flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-              <span className="text-[11px] font-bold text-muted-foreground">{t.apiLabel}</span>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-orange-500 hover:underline flex items-center gap-0.5 ml-auto"
-              >
-                {lang === 'ar' ? 'مفتاح مجاني' : 'Free Key'}
-                <ExternalLink className="w-2.5 h-2.5" />
-              </a>
-            </div>
-            <Input
-              type="password"
-              placeholder={t.apiKeyPlaceholder}
-              value={apiKey}
-              onChange={(e) => handleSaveApiKey(e.target.value)}
-              className="h-9 text-xs w-full sm:w-64 dir-ltr rounded-xl"
-            />
-          </div>
+          <Input
+            type="password"
+            placeholder={t.apiKeyPlaceholder}
+            value={apiKey}
+            onChange={(e) => handleSaveApiKey(e.target.value)}
+            className="h-9 text-xs w-full sm:w-56 dir-ltr rounded-xl"
+          />
         </div>
       </header>
 
-      {/* Multi-Image Navigation Bar */}
+      {/* Bar for images */}
       {images.length > 0 && (
         <div className="mb-6 p-3 bg-card border border-border rounded-2xl flex items-center justify-between gap-3 overflow-x-auto shadow-sm">
           <div className="flex items-center gap-2">
@@ -741,20 +752,12 @@ export default function Index() {
                   key={img.id}
                   onClick={() => setActiveImageIndex(idx)}
                   className={`relative px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                    activeImageIndex === idx
-                      ? 'bg-orange-600 text-white shadow-md'
-                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                    activeImageIndex === idx ? 'bg-orange-600 text-white shadow-md' : 'bg-muted hover:bg-muted/80 text-foreground'
                   }`}
                 >
                   #{idx + 1}
                   {resultsMap[img.id] && <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>}
-                  <Trash2
-                    className="w-3 h-3 hover:text-red-400"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveImage(idx);
-                    }}
-                  />
+                  <Trash2 className="w-3 h-3 hover:text-red-400" onClick={(e) => { e.stopPropagation(); handleRemoveImage(idx); }} />
                 </button>
               ))}
             </div>
@@ -783,32 +786,14 @@ export default function Index() {
 
           {images.length > 0 && (
             <div className="flex flex-wrap justify-center gap-3 pt-2">
-              <Button
-                onClick={() => handleAnalyzeCurrent(false)}
-                disabled={isAnalyzing}
-                className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md"
-              >
-                <Sparkles className="w-4 h-4" />
-                {lang === 'ar' ? 'تحليل الصورة الحالية' : 'Analyze Current Image'}
+              <Button onClick={() => handleAnalyzeCurrent(false)} disabled={isAnalyzing} className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
+                <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'تحليل الصورة الحالية' : 'Analyze Current Image'}
               </Button>
-
-              <Button
-                onClick={() => handleAnalyzeCurrent(true)}
-                disabled={isAnalyzing}
-                variant="outline"
-                className="border-orange-500/40 text-orange-600 dark:text-orange-400 font-bold h-11 px-6 rounded-xl gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                {t.extractOcrOnly}
+              <Button onClick={() => handleAnalyzeCurrent(true)} disabled={isAnalyzing} variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 font-bold h-11 px-6 rounded-xl gap-2">
+                <FileText className="w-4 h-4" /> {t.extractOcrOnly}
               </Button>
-
-              <Button
-                onClick={() => handleAnalyzeAll(false)}
-                disabled={isAnalyzing}
-                className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md"
-              >
-                <Play className="w-4 h-4 text-orange-400" />
-                {t.analyzeAll} ({images.length})
+              <Button onClick={() => handleAnalyzeAll(false)} disabled={isAnalyzing} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
+                <Play className="w-4 h-4 text-orange-400" /> {t.analyzeAll} ({images.length})
               </Button>
             </div>
           )}
@@ -821,151 +806,99 @@ export default function Index() {
               <ArrowLeft className="w-4 h-4" /> {t.backToUpload}
             </Button>
 
-            {/* شريط البحث والاستبدال المدمج */}
+            {/* شريط البحث والاستبدال */}
             <div className="flex flex-wrap items-center gap-2 bg-muted/40 p-1.5 rounded-xl border border-border/60">
               <div className="flex items-center gap-1.5 px-2">
                 <Search className="w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  placeholder={t.findPlaceholder}
-                  value={findText}
-                  onChange={(e) => setFindText(e.target.value)}
-                  className="h-7 text-xs w-28 bg-background"
-                />
+                <Input placeholder={t.findPlaceholder} value={findText} onChange={(e) => setFindText(e.target.value)} className="h-7 text-xs w-28 bg-background" />
               </div>
               <div className="flex items-center gap-1.5 px-1">
                 <Replace className="w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  placeholder={t.replacePlaceholder}
-                  value={replaceText}
-                  onChange={(e) => setReplaceText(e.target.value)}
-                  className="h-7 text-xs w-28 bg-background"
-                />
+                <Input placeholder={t.replacePlaceholder} value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className="h-7 text-xs w-28 bg-background" />
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => handleFindAndReplace('current')}
-                className="h-7 text-[11px] font-bold px-2 rounded-lg"
-              >
+              <Button size="sm" variant="secondary" onClick={() => handleFindAndReplace('current')} className="h-7 text-[11px] font-bold px-2 rounded-lg">
                 {t.replaceCurrentPage}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleFindAndReplace('all')}
-                className="h-7 text-[11px] font-bold px-2 rounded-lg"
-              >
+              <Button size="sm" variant="outline" onClick={() => handleFindAndReplace('all')} className="h-7 text-[11px] font-bold px-2 rounded-lg">
                 {t.replaceAllPages}
               </Button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => handleAnalyzeCurrent(false)}
-                disabled={isAnalyzing}
-                className="gap-2 text-xs font-bold rounded-xl"
-              >
+              <Button variant="ghost" onClick={() => handleAnalyzeCurrent(false)} disabled={isAnalyzing} className="gap-2 text-xs font-bold rounded-xl">
                 <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} /> {t.reAnalyze}
               </Button>
 
-              <Button
-                variant="outline"
-                onClick={() => handleAnalyzeCurrent(true)}
-                disabled={isAnalyzing}
-                className="gap-2 text-xs font-bold rounded-xl text-orange-500"
-              >
-                <FileText className="w-3.5 h-3.5" /> {t.extractOcrOnly}
-              </Button>
-
-              <Button
-                variant="secondary"
-                onClick={() => handleAnalyzeAll(false)}
-                disabled={isAnalyzing}
-                className="gap-2 text-xs font-bold rounded-xl"
-              >
-                <Play className="w-3.5 h-3.5" /> {t.analyzeAll}
-              </Button>
-
-              {/* قائمة تصدير النص الأصلي (OCR) */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 gap-1.5 text-xs font-bold rounded-xl">
-                    <FileDown className="w-4 h-4" />
-                    {t.exportOriginal}
-                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+                    <FileDown className="w-4 h-4" /> {t.exportOriginal} <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl">
-                  <DropdownMenuLabel className="text-xs font-bold">{t.exportOriginal}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleExportText('current', 'original')} className="text-xs font-medium cursor-pointer">
-                    {t.exportCurrentPage} (page_{activeImageIndex + 1}_ocr_original_script.txt)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportText('all', 'original')} className="text-xs font-medium cursor-pointer">
-                    {t.exportAllPages} (full_ocr_original_script.txt)
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('current', 'original')} className="text-xs cursor-pointer">{t.exportCurrentPage}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('all', 'original')} className="text-xs cursor-pointer">{t.exportAllPages}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* قائمة تصدير النص المترجم */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5 text-xs font-bold rounded-xl">
-                    <Download className="w-4 h-4" />
-                    {t.exportTranslated}
-                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+                    <Download className="w-4 h-4" /> {t.exportTranslated} <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl">
-                  <DropdownMenuLabel className="text-xs font-bold">{t.exportTranslated}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleExportText('current', 'translated')} className="text-xs font-medium cursor-pointer">
-                    {t.exportCurrentPage} (page_{activeImageIndex + 1}_translated_script.txt)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportText('all', 'translated')} className="text-xs font-medium cursor-pointer">
-                    {t.exportAllPages} (full_translated_script.txt)
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('current', 'translated')} className="text-xs cursor-pointer">{t.exportCurrentPage}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('all', 'translated')} className="text-xs cursor-pointer">{t.exportAllPages}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Image Preview Panel */}
+            {/* Image Preview Panel with Canvas Overlay Feature */}
             <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
               <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
                 <span>{t.pagePreview} (#{activeImageIndex + 1})</span>
-                {images.length > 1 && (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-6 w-6 rounded-md"
-                      disabled={activeImageIndex === 0}
-                      onClick={() => setActiveImageIndex((prev) => prev - 1)}
-                    >
-                      <ChevronRight className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-6 w-6 rounded-md"
-                      disabled={activeImageIndex === images.length - 1}
-                      onClick={() => setActiveImageIndex((prev) => prev + 1)}
-                    >
-                      <ChevronLeft className="w-3 h-3" />
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* 🖼️ زر تفعيل/إيقاف المعاينة البصرية النصية */}
+                  <Button
+                    variant={showOverlay ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowOverlay(!showOverlay)}
+                    className={`h-7 text-[11px] font-bold gap-1 rounded-lg ${showOverlay ? 'bg-orange-600 text-white' : ''}`}
+                  >
+                    {showOverlay ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    {t.visualOverlay}
+                  </Button>
+                </div>
               </div>
-              <CardContent className="p-4 flex-1 overflow-y-auto flex justify-center items-start">
+              <CardContent className="p-4 flex-1 overflow-y-auto flex justify-center items-start relative">
                 {activeImage ? (
-                  <img
-                    src={activeImage.url}
-                    alt="Manga Page"
-                    className="w-full max-w-[550px] h-auto object-contain rounded-lg shadow-md transition-transform"
-                  />
+                  <div className="relative w-full max-w-[550px]">
+                    <img
+                      src={activeImage.url}
+                      alt="Manga Page"
+                      className="w-full h-auto object-contain rounded-lg shadow-md"
+                    />
+                    {/* طبقة المعاينة البصرية للنصوص المترجمة (Canvas Overlay) */}
+                    {showOverlay && currentItems.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        onMouseEnter={() => setHoveredItemId(item.id)}
+                        onMouseLeave={() => setHoveredItemId(null)}
+                        style={{ top: `${item.topPercent ?? ((idx + 1) * 15)}%` }}
+                        className={`absolute left-1/2 -translate-x-1/2 w-[85%] bg-black/80 backdrop-blur-md text-white border text-center p-2 rounded-xl text-xs font-bold transition-all shadow-xl cursor-pointer ${
+                          hoveredItemId === item.id
+                            ? 'border-orange-500 scale-105 bg-orange-950/90 text-orange-200 ring-2 ring-orange-500'
+                            : 'border-orange-500/40 hover:border-orange-400'
+                        }`}
+                      >
+                        <span className="text-[10px] text-orange-400 block mb-0.5">#{idx + 1} ({item.category})</span>
+                        {item.translatedText}
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground m-auto">{t.noImage}</p>
                 )}
@@ -979,7 +912,6 @@ export default function Index() {
                   <Sparkles className="w-4 h-4 text-orange-500" />
                   {t.extractedTexts} ({currentItems.length})
                 </h3>
-                {/* زر نسخ كافة النصوص للصفحة الحالية */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -1007,47 +939,28 @@ export default function Index() {
                       <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
                         {t.paragraph} #{idx + 1}
                       </span>
-                      {/* أزرار تقديم وتأخير الترتيب */}
                       <div className="flex items-center gap-0.5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={idx === 0}
-                          onClick={() => handleMoveItem(idx, 'up')}
-                          className="h-6 w-6 rounded-md"
-                        >
+                        <Button variant="ghost" size="icon" disabled={idx === 0} onClick={() => handleMoveItem(idx, 'up')} className="h-6 w-6 rounded-md">
                           <ArrowUp className="w-3 h-3" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={idx === currentItems.length - 1}
-                          onClick={() => handleMoveItem(idx, 'down')}
-                          className="h-6 w-6 rounded-md"
-                        >
+                        <Button variant="ghost" size="icon" disabled={idx === currentItems.length - 1} onClick={() => handleMoveItem(idx, 'down')} className="h-6 w-6 rounded-md">
                           <ArrowDown className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {/* زر نسخ هذه الفقرة */}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          handleCopyText(formatTextWithRules(item.translatedText, item.category))
-                        }
+                        onClick={() => handleCopyText(formatTextWithRules(item.translatedText, item.category))}
                         className="h-7 px-2 text-[11px] gap-1 font-bold text-muted-foreground hover:text-orange-500"
                       >
                         <Copy className="w-3 h-3" />
                         {t.copyBlock}
                       </Button>
 
-                      <Select
-                        value={item.category}
-                        onValueChange={(val) => updateItem(item.id, 'category', val)}
-                      >
+                      <Select value={item.category} onValueChange={(val) => updateItem(item.id, 'category', val)}>
                         <SelectTrigger className="w-[170px] h-8 text-xs font-bold">
                           <SelectValue />
                         </SelectTrigger>

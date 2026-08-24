@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { ResultsView } from '@/components/ResultsView';
 import { toast } from 'sonner';
-import { KeyRound, BookOpen, Settings2, Moon, Sun, Plus, Trash2, Save, X, Sparkles, Globe } from 'lucide-react';
+import { KeyRound, BookOpen, Settings2, Moon, Sun, Plus, Trash2, Save, X, Sparkles, Globe, HelpCircle, ScanText, Languages } from 'lucide-react';
 
 interface TyperRule {
   id: string;
@@ -20,31 +20,25 @@ const DEFAULT_RULES: TyperRule[] = [
   { id: '6', name: 'كلام خارجي', prefix: 'OT:', categoryKey: 'narrator' },
 ];
 
-// نصوص واجهة المستخدم باللغتين العربية والإنجليزية
+// نصوص الواجهة المتغيرة فقط (مع ثبات الهيدر والـ Layout)
 const uiTranslations = {
   ar: {
-    title: "مترجم المانوا والتأثير الاحترافي",
-    subtitle: "منصة التنضيد واستخراج النصوص الذكية لـ Photoshop",
     tagsBtn: "تعديل علامات التايبير",
     apiKeyLabel: "Gemini API Key:",
     apiKeyLink: "احصل على مفتاح مجاني من هنا ↗",
-    apiKeyPlaceholder: "ضع الـ API Key الخاص بك هنا...",
+    apiKeyTooltip: "مفتاح مجاني من Google AI Studio يسمح للموقع بالاتصال بالذكاء الاصطناعي للتعرف على النصوص وترجمتها.",
     targetLangLabel: "لغة الترجمة المطلوبة:",
-    ocrOnly: "استخراج النص الأصلي فقط (OCR Mode - بدون ترجمة)",
-    dropzoneTitle: "اسحب الملفات هنا أو انقر للاختيار",
-    dropzoneSubtitle: "يدعم ملفات ZIP المضغوطة أو تحديد صور متعددة معا (JPG, PNG, WEBP)",
+    modeTranslate: "ترجمة + استخراج (وضع كامل)",
+    modeOcrOnly: "استخراج النص فقط (OCR Mode)",
   },
   en: {
-    title: "Manga & Webtoon Translator Pro",
-    subtitle: "Smart Typesetting & Text Extraction Platform for Photoshop",
     tagsBtn: "Edit Typer Tags",
     apiKeyLabel: "Gemini API Key:",
     apiKeyLink: "Get a free API Key here ↗",
-    apiKeyPlaceholder: "Enter your API Key here...",
+    apiKeyTooltip: "A free key from Google AI Studio that connects the app to AI for OCR and translation.",
     targetLangLabel: "Target Translation Language:",
-    ocrOnly: "Extract Original Text Only (OCR Mode - No Translation)",
-    dropzoneTitle: "Drag & drop files here, or click to select",
-    dropzoneSubtitle: "Supports ZIP archives or multiple images (JPG, PNG, WEBP)",
+    modeTranslate: "Translate + Extract (Full Mode)",
+    modeOcrOnly: "Extract Text Only (OCR Mode)",
   }
 };
 
@@ -52,14 +46,13 @@ export default function Index() {
   const [pages, setPages] = useState<any[]>([]);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   // General Options
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
   const [targetLang, setTargetLang] = useState<'ar' | 'en'>('ar');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [isOcrOnly, setIsOcrOnly] = useState<boolean>(false);
-  const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar');
+  const [uiLang, setUiLang] = useState<'ar' | 'en'>('en');
 
   // Typer Tags Settings State
   const [typerRules, setTyperRules] = useState<TyperRule[]>(() => {
@@ -73,7 +66,6 @@ export default function Index() {
     localStorage.setItem('gemini_api_key', apiKey);
   }, [apiKey]);
 
-  // Save Typer Rules to localStorage
   const handleSaveRules = () => {
     localStorage.setItem('typer_rules', JSON.stringify(typerRules));
     toast.success('تم حفظ إعدادات علامات التايبير بنجاح!');
@@ -101,8 +93,8 @@ export default function Index() {
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} transition-colors duration-300 font-sans`}>
       
-      {/* Header Bar */}
-      <header className="flex items-center justify-between p-4 bg-slate-900/60 border-b border-slate-800 backdrop-blur-md sticky top-0 z-40">
+      {/* Header Bar - ثابت بالكامل وباتجاه LTR دائماً */}
+      <header className="flex items-center justify-between p-4 bg-slate-900/60 border-b border-slate-800 backdrop-blur-md sticky top-0 z-40" dir="ltr">
         <div className="flex items-center gap-3">
           {/* UI Language Switcher */}
           <button
@@ -110,7 +102,7 @@ export default function Index() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:text-orange-400 text-xs font-bold transition-all shadow-sm"
           >
             <Globe className="w-4 h-4 text-orange-400" />
-            <span>{uiLang === 'ar' ? 'English (EN)' : 'العربية (AR)'}</span>
+            <span>{uiLang === 'ar' ? 'العربية (AR)' : 'English (EN)'}</span>
           </button>
 
           {/* Edit Typer Tags Button */}
@@ -131,13 +123,14 @@ export default function Index() {
           </button>
         </div>
 
+        {/* Title & Subtitle ثابتين باللغة الإنجليزية دائماً */}
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <h1 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <h1 className="text-base font-bold text-slate-100 flex items-center justify-end gap-2">
               <span className="bg-orange-500/20 text-orange-400 text-[10px] px-2 py-0.5 rounded-full border border-orange-500/30 font-mono">v2.0 PRO</span>
-              {uiTranslations[uiLang].title}
+              Manga & Webtoon Translator Pro
             </h1>
-            <p className="text-xs text-slate-400">{uiTranslations[uiLang].subtitle}</p>
+            <p className="text-xs text-slate-400">Smart Typesetting & Text Extraction Platform for Photoshop</p>
           </div>
           <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg shadow-orange-500/20">
             <BookOpen className="w-5 h-5 text-white" />
@@ -145,8 +138,8 @@ export default function Index() {
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-6xl mx-auto p-6 space-y-6" dir={uiLang === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Main Container - محاذاة وتخطيط ثابت LTR لمشابهة الصور تماماً */}
+      <main className="max-w-6xl mx-auto p-6 space-y-6" dir="ltr">
         
         {view === 'upload' ? (
           <>
@@ -163,20 +156,30 @@ export default function Index() {
                       <KeyRound className="w-4 h-4 text-orange-400" />
                       {uiTranslations[uiLang].apiKeyLabel}
                     </label>
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] text-orange-400 hover:text-orange-300 underline font-medium"
-                    >
-                      {uiTranslations[uiLang].apiKeyLink}
-                    </a>
+                    
+                    <div className="flex items-center gap-1.5 relative group">
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-orange-400 hover:text-orange-300 underline font-medium"
+                      >
+                        {uiTranslations[uiLang].apiKeyLink}
+                      </a>
+                      
+                      {/* أيقونة التعجب والشرح (Tooltip) */}
+                      <HelpCircle className="w-3.5 h-3.5 text-slate-400 hover:text-orange-400 cursor-pointer transition-colors" />
+                      <div className="absolute bottom-full right-0 mb-2 w-64 p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-300 shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all z-50 leading-relaxed text-right" dir="rtl">
+                        {uiTranslations[uiLang].apiKeyTooltip}
+                      </div>
+                    </div>
                   </div>
+
                   <input
                     type="password"
                     className="w-full p-3.5 text-sm border border-slate-700 rounded-xl bg-slate-950/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 font-mono transition-all text-left"
                     dir="ltr"
-                    placeholder={uiTranslations[uiLang].apiKeyPlaceholder}
+                    placeholder="****************************************"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                   />
@@ -214,20 +217,39 @@ export default function Index() {
 
               </div>
 
-              {/* OCR Toggle */}
-              <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-start">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none text-sm text-slate-300 hover:text-white transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={isOcrOnly}
-                    onChange={(e) => setIsOcrOnly(e.target.checked)}
-                    className="w-4 h-4 accent-orange-500 rounded cursor-pointer"
-                  />
-                  <span className="text-xs font-semibold text-orange-400">
-                    {uiTranslations[uiLang].ocrOnly}
-                  </span>
-                </label>
+              {/* Mode Toggle Bar - استبدال المربع بزر اختيار كبير وأنيق */}
+              <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-400">
+                  {uiLang === 'ar' ? 'وضع معالجة الصور:' : 'Processing Mode:'}
+                </span>
+
+                <div className="inline-flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setIsOcrOnly(false)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      !isOcrOnly
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-500/20'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Languages className="w-4 h-4" />
+                    <span>{uiTranslations[uiLang].modeTranslate}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsOcrOnly(true)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      isOcrOnly
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-orange-500/20'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <ScanText className="w-4 h-4" />
+                    <span>{uiTranslations[uiLang].modeOcrOnly}</span>
+                  </button>
+                </div>
               </div>
+
             </div>
 
             {/* Drag & Drop Upload Zone */}
@@ -256,7 +278,7 @@ export default function Index() {
 
       {/* Typer Tags Settings Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50" dir="rtl">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">

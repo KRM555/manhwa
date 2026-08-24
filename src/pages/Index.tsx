@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { UploadZone } from '@/components/UploadZone';
-import { TranslationConfig, SampleManga } from '@/types/manga';
+import UploadZone from '@/components/UploadZone';
+import { TranslationConfig } from '@/types/manga';
 import { ArrowLeft, Download, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
 
 export interface ExtractedText {
   id: string;
@@ -34,42 +35,38 @@ const CATEGORIES = [
 
 export default function Index() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
   const [view, setView] = useState<'upload' | 'results'>('upload');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const [config, setConfig] = useState<TranslationConfig>({
-    targetLanguage: 'ar',
-    extractSFX: true,
-    detectVerticalText: true,
-  });
+  // المفتاح واللغة المفترضة (يمكنك ربطهما بحالة إعدادات التطبيق لديك)
+  const [apiKey, setApiKey] = useState<string>(localStorage.getItem('gemini_api_key') || '');
+  const [targetLang, setTargetLang] = useState<string>('ar');
+  const [isOcrOnly, setIsOcrOnly] = useState<boolean>(false);
 
-  const [items, setItems] = useState<ExtractedText[]>([
-    { id: '1', originalText: 'たすけて！', translatedText: 'أنقذوني!', category: 'scream' },
-    { id: '2', originalText: '何だこれは…？', translatedText: 'ما هذا...؟', category: 'thought' },
-    { id: '3', originalText: 'ドン！', translatedText: 'بوم!', category: 'sfx' },
-  ]);
+  const [items, setItems] = useState<ExtractedText[]>([]);
 
-  const handleImageSelected = (url: string, name: string, _sampleData?: SampleManga) => {
-    setImagePreview(url);
-    setFileName(name);
-  };
+  // استلام نتائج معالجة Gemini من مكون UploadZone
+  const handlePagesLoaded = (pages: any[]) => {
+    if (!pages || pages.length === 0) return;
 
-  const handleClearImage = () => {
-    setImagePreview(null);
-    setFileName(null);
-  };
+    const firstPage = pages[0];
+    setImagePreview(firstPage.imageUrl || null);
 
-  const handleConfigChange = (updated: Partial<TranslationConfig>) => {
-    setConfig((prev) => ({ ...prev, ...updated }));
-  };
+    // دمج نصوص الصفحات إذا تم رفع أكثر من صورة أو أخذ الصفحة الأولى
+    const extractedItems: ExtractedText[] = (firstPage.items || firstPage.blocks || []).map(
+      (item: any, idx: number) => ({
+        id: item.id || `text_${idx}`,
+        originalText: item.originalText || item.original || '',
+        translatedText: item.translatedText || item.translated || item.text || '',
+        category: item.category || item.type || 'dialogue',
+      })
+    );
 
-  const handleAnalyze = () => {
-    setIsAnalyzing(true);
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    setItems(extractedItems);
+
+    // إذا اكتمل الاستخراج تحول لصفحة النتائج تلقائياً
+    if (firstPage.status === 'completed') {
       setView('results');
-    }, 800);
+    }
   };
 
   const updateItem = (id: string, field: keyof ExtractedText, value: string) => {
@@ -92,16 +89,14 @@ export default function Index() {
 
       {/* View Switcher */}
       {view === 'upload' ? (
-        <UploadZone
-          imagePreview={imagePreview}
-          fileName={fileName}
-          config={config}
-          isAnalyzing={isAnalyzing}
-          onImageSelected={handleImageSelected}
-          onClearImage={handleClearImage}
-          onConfigChange={handleConfigChange}
-          onAnalyze={handleAnalyze}
-        />
+        <div className="space-y-4">
+          <UploadZone
+            apiKey={apiKey}
+            targetLang={targetLang}
+            isOcrOnly={isOcrOnly}
+            onPagesLoaded={handlePagesLoaded}
+          />
+        </div>
       ) : (
         <div className="space-y-6">
           {/* Header Bar */}
@@ -123,12 +118,14 @@ export default function Index() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="rounded-2xl overflow-hidden border-border">
               <CardContent className="p-4 flex items-center justify-center bg-zinc-950/5 min-h-[500px]">
-                {imagePreview && (
+                {imagePreview ? (
                   <img
                     src={imagePreview}
                     alt="Uploaded Page"
                     className="max-h-[700px] w-auto object-contain rounded-lg shadow-md"
                   />
+                ) : (
+                  <p className="text-sm text-muted-foreground">لا توجد صورة معروضة</p>
                 )}
               </CardContent>
             </Card>
@@ -138,48 +135,54 @@ export default function Index() {
                 النصوص المستخرجة ({items.length})
               </h3>
 
-              {items.map((item, idx) => (
-                <Card key={item.id} className="p-4 space-y-3 border-border rounded-xl">
-                  <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
-                    <span>فقرة #{idx + 1}</span>
-                    <Select
-                      value={item.category}
-                      onValueChange={(val) => updateItem(item.id, 'category', val)}
-                    >
-                      <SelectTrigger className="w-[180px] h-8 text-xs font-bold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {items.length === 0 ? (
+                <div className="text-center p-8 text-muted-foreground border border-dashed rounded-xl">
+                  لم يتم العثور على نصوص في هذه الصورة.
+                </div>
+              ) : (
+                items.map((item, idx) => (
+                  <Card key={item.id} className="p-4 space-y-3 border-border rounded-xl">
+                    <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
+                      <span>فقرة #{idx + 1}</span>
+                      <Select
+                        value={item.category}
+                        onValueChange={(val) => updateItem(item.id, 'category', val)}
+                      >
+                        <SelectTrigger className="w-[180px] h-8 text-xs font-bold">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground">النص الأصلي:</label>
-                    <Textarea
-                      value={item.originalText}
-                      onChange={(e) => updateItem(item.id, 'originalText', e.target.value)}
-                      className="min-h-[50px] text-sm dir-ltr"
-                    />
-                  </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground">النص الأصلي:</label>
+                      <Textarea
+                        value={item.originalText}
+                        onChange={(e) => updateItem(item.id, 'originalText', e.target.value)}
+                        className="min-h-[50px] text-sm dir-ltr"
+                      />
+                    </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-orange-600 dark:text-orange-400">
-                      النص المترجم:
-                    </label>
-                    <Textarea
-                      value={item.translatedText}
-                      onChange={(e) => updateItem(item.id, 'translatedText', e.target.value)}
-                      className="min-h-[50px] text-sm font-medium"
-                    />
-                  </div>
-                </Card>
-              ))}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                        النص المترجم:
+                      </label>
+                      <Textarea
+                        value={item.translatedText}
+                        onChange={(e) => updateItem(item.id, 'translatedText', e.target.value)}
+                        className="min-h-[50px] text-sm font-medium"
+                      />
+                    </div>
+                  </Card>
+                ))
+              )}
             </div>
           </div>
         </div>

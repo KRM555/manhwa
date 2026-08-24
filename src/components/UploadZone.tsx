@@ -1,19 +1,12 @@
-import React, { useRef, useState } from 'react';
-import { Upload, Image as ImageIcon, Sparkles, X, CheckCircle2, Sliders, Volume2, FileText, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
-import { TARGET_LANGUAGES, SAMPLE_MANGA_PAGES } from '@/data/samples';
+import React, { useRef } from 'react';
 import { TranslationConfig, SampleManga } from '@/types/manga';
+import { Upload, FileArchive, Check, Sparkles, HelpCircle, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import JSZip from 'jszip';
 
 interface UploadZoneProps {
   imagePreview: string | null;
@@ -21,295 +14,260 @@ interface UploadZoneProps {
   config: TranslationConfig;
   isAnalyzing: boolean;
   onImageSelected: (url: string, name: string, sampleData?: SampleManga) => void;
+  onMultipleImagesSelected?: (images: { url: string; name: string }[]) => void;
   onClearImage: () => void;
   onConfigChange: (updated: Partial<TranslationConfig>) => void;
   onAnalyze: () => void;
+  lang?: 'ar' | 'en';
 }
 
-export const UploadZone: React.FC<UploadZoneProps> = ({
+const UI_TEXT = {
+  ar: {
+    dropTitle: 'اسحب وأسقط صفحات المانجا / الويب تون هنا',
+    dropSubtitle: 'يدعم رفع حتى 10 صور دفعة واحدة أو ملف مضغوط ZIP (PNG, JPG, WEBP)',
+    uploadBtn: 'اختر صوراً أو ملف ZIP',
+    sampleTitle: 'أو جرب صفحة تجريبية:',
+    controlsTitle: 'إعدادات الترجمة والاستخراج',
+    targetLang: 'اللغة المستهدفة للترجمة',
+    sfxLabel: 'استخراج المؤثرات الصوتية (SFX)',
+    sfxSub: 'ترجمة المؤثرات الجانبية مثل (Boom, Splash) بجانب نصوص الحوارات',
+    verticalLabel: 'كشف النص العمودي وتحديد اتجاه القراءة تلقائياً',
+    verticalSub: 'فحص اتجاه قراءة المانجا اليابانية (من اليمين لليسار)',
+    analyzeBtn: 'تحليل واستخراج النصوص',
+    analyzingBtn: 'جاري المعالجة بواسطة Gemini...',
+    infoNote: 'يتم المعالجة والتعرف الضوئي (OCR) والترجمة في خطوة واحدة ذكية.',
+    limitError: 'الحد الأقصى هو 10 صور فقط',
+  },
+  en: {
+    dropTitle: 'Drag & Drop your Manga / Manhwa pages',
+    dropSubtitle: 'Supports uploading up to 10 images or a ZIP archive (PNG, JPG, WEBP, ZIP)',
+    uploadBtn: 'Upload Images or ZIP',
+    sampleTitle: 'OR TRY A SAMPLE PAGE:',
+    controlsTitle: 'Translation & Extraction Controls',
+    targetLang: 'TARGET LANGUAGE',
+    sfxLabel: 'Extract Sound Effects (SFX)',
+    sfxSub: 'Translates onomatopoeia alongside speech bubbles',
+    verticalLabel: 'Vertical Text & Right-to-Left Auto Detect',
+    verticalSub: 'Automatically scans vertical manga reading flow',
+    analyzeBtn: 'Analyze Image',
+    analyzingBtn: 'Analyzing with Gemini...',
+    infoNote: 'Processes OCR, Text Inpainting & Translation in a single step.',
+    limitError: 'Maximum limit is 10 images',
+  },
+};
+
+export function UploadZone({
   imagePreview,
   fileName,
   config,
   isAnalyzing,
   onImageSelected,
-  onClearImage,
+  onMultipleImagesSelected,
   onConfigChange,
   onAnalyze,
-}) => {
-  const [isDragging, setIsDragging] = useState(false);
+  lang = 'ar',
+}: UploadZoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const t = UI_TEXT[lang];
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload a valid image file (PNG, JPG, WEBP).');
+  const processFiles = async (files: FileList | File[]) => {
+    const fileList = Array.from(files);
+    const zipFile = fileList.find((f) => f.name.endsWith('.zip') || f.type.includes('zip'));
+
+    if (zipFile) {
+      try {
+        toast.info(lang === 'ar' ? 'جاري فك الملف المضغوط...' : 'Extracting ZIP file...');
+        const zip = new JSZip();
+        const zipContent = await zip.loadAsync(zipFile);
+        const extractedImages: { url: string; name: string }[] = [];
+
+        const entries = Object.keys(zipContent.files).filter((filename) =>
+          /\.(jpg|jpeg|png|webp)$/i.test(filename)
+        );
+
+        if (entries.length === 0) {
+          toast.error(lang === 'ar' ? 'لم يتم العثور على صور داخل ZIP' : 'No images found inside ZIP');
+          return;
+        }
+
+        const selectedEntries = entries.slice(0, 10);
+        for (const entryName of selectedEntries) {
+          const fileData = await zipContent.files[entryName].async('base64');
+          const ext = entryName.split('.').pop()?.toLowerCase() || 'jpeg';
+          const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+          extractedImages.push({
+            url: `data:${mime};base64,${fileData}`,
+            name: entryName,
+          });
+        }
+
+        if (onMultipleImagesSelected) {
+          onMultipleImagesSelected(extractedImages);
+        } else if (extractedImages.length > 0) {
+          onImageSelected(extractedImages[0].url, extractedImages[0].name);
+        }
+        toast.success(
+          lang === 'ar'
+            ? `تم استخراج ${extractedImages.length} صور من الملف المضغوط!`
+            : `Extracted ${extractedImages.length} images from ZIP!`
+        );
+      } catch (err) {
+        toast.error(lang === 'ar' ? 'تعذر قراءة ملف ZIP' : 'Failed to read ZIP file');
+      }
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const url = e.target?.result as string;
-      onImageSelected(url, file.name);
-      toast.success(`Loaded image: ${file.name}`);
-    };
-    reader.readAsDataURL(file);
-  };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+    // التعامل مع عدة صور عادية
+    const imageFiles = fileList.filter((f) => f.type.startsWith('image/')).slice(0, 10);
+    if (imageFiles.length === 0) return;
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+    if (imageFiles.length === 1) {
+      const file = imageFiles[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          onImageSelected(e.target.result as string, file.name);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const loadedImages: { url: string; name: string }[] = [];
+      let readCount = 0;
+
+      imageFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            loadedImages.push({ url: e.target.result as string, name: file.name });
+          }
+          readCount++;
+          if (readCount === imageFiles.length) {
+            if (onMultipleImagesSelected) {
+              onMultipleImagesSelected(loadedImages);
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFile(e.target.files[0]);
+      processFiles(e.dataTransfer.files);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Main Upload Box */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
+    <div className="space-y-6 w-full max-w-5xl mx-auto">
+      {/* Drop Zone */}
+      <Card
+        onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
-        className={`relative border-2 border-dashed rounded-3xl transition-all duration-300 overflow-hidden ${
-          isDragging
-            ? 'border-orange-500 bg-orange-50/50 dark:bg-orange-950/20 scale-[1.005]'
-            : imagePreview
-            ? 'border-primary/30 bg-card shadow-sm'
-            : 'border-border/80 bg-muted/20 hover:border-orange-400/80 hover:bg-orange-50/20 dark:hover:bg-zinc-900/40'
-        }`}
+        className="p-8 sm:p-12 border-2 border-dashed border-border hover:border-orange-500/50 bg-card/50 transition-colors rounded-3xl text-center space-y-4"
       >
+        <div className="w-16 h-16 bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center mx-auto">
+          <Upload className="w-8 h-8" />
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-foreground">{t.dropTitle}</h2>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">{t.dropSubtitle}</p>
+        </div>
+
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.zip"
+          multiple
           className="hidden"
-          onChange={handleFileInputChange}
+          onChange={(e) => e.target.files && processFiles(e.target.files)}
         />
 
-        {!imagePreview ? (
-          <div className="p-8 sm:p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
-            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
-              <Upload className="w-8 h-8 stroke-[2.2]" />
-            </div>
+        <div className="flex justify-center gap-3">
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-orange-600 hover:bg-orange-700 text-white font-bold gap-2 text-sm px-6 h-11 rounded-xl shadow-md"
+          >
+            <FileArchive className="w-4 h-4" />
+            {t.uploadBtn}
+          </Button>
+        </div>
+      </Card>
 
-            <h3 className="text-xl font-bold tracking-tight text-foreground mb-2">
-              Drag & Drop your Manga / Manhwa page
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md mb-6">
-              Supports Japanese Manga, Korean Manhwa, Chinese Manhua, or raw scans (PNG, JPG, WEBP).
-            </p>
+      {/* Control Box */}
+      <Card className="p-6 border-border rounded-2xl space-y-6 bg-card">
+        <h3 className="font-bold text-sm text-foreground flex items-center gap-2 border-b border-border pb-3">
+          <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+          {t.controlsTitle}
+        </h3>
 
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-md shadow-orange-600/20 px-6 h-11 rounded-xl"
-              >
-                <ImageIcon className="w-4 h-4 mr-2" />
-                Upload Image
-              </Button>
-            </div>
-
-            {/* Quick Demo Samples */}
-            <div className="mt-8 pt-6 border-t border-border/50 w-full max-w-lg">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                Or try a sample page:
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {SAMPLE_MANGA_PAGES.map((sample) => (
-                  <button
-                    key={sample.id}
-                    type="button"
-                    onClick={() => {
-                      onImageSelected(sample.fullImage, sample.title, sample);
-                      toast.success(`Loaded sample: ${sample.title}`);
-                    }}
-                    className="flex items-center gap-3 p-2.5 rounded-xl border border-border bg-card/80 hover:bg-accent/70 hover:border-orange-500/50 transition-all text-left group"
-                  >
-                    <img
-                      src={sample.thumbnail}
-                      alt={sample.title}
-                      className="w-12 h-12 rounded-lg object-cover border border-border group-hover:scale-105 transition-transform"
-                    />
-                    <div className="truncate">
-                      <p className="text-xs font-bold text-foreground truncate">{sample.title}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">{sample.genre}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-6">
-            <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
-              <div className="flex items-center gap-3 truncate">
-                <div className="w-9 h-9 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div className="truncate">
-                  <p className="text-sm font-bold text-foreground truncate">{fileName || 'Selected Image'}</p>
-                  <p className="text-xs text-muted-foreground">Ready for OCR detection and translation</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-xs rounded-lg"
-                >
-                  Replace
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClearImage}
-                  className="text-muted-foreground hover:text-destructive rounded-lg h-8 w-8"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Preview image */}
-            <div className="relative rounded-2xl overflow-hidden bg-zinc-950/5 dark:bg-zinc-900 border border-border max-h-[380px] flex items-center justify-center p-2">
-              <img
-                src={imagePreview}
-                alt="Manga Preview"
-                className="max-h-[360px] w-auto object-contain rounded-xl shadow-sm"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Options Controls Section */}
-      <Card className="rounded-2xl border-border shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Sliders className="w-4 h-4 text-orange-500" />
-            <h3 className="font-bold text-base text-foreground">Translation & Extraction Controls</h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Target Language Selector */}
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Target Language
-              </Label>
-              <Select
-                value={config.targetLanguage}
-                onValueChange={(val) => onConfigChange({ targetLanguage: val })}
-              >
-                <SelectTrigger className="h-11 rounded-xl font-medium">
-                  <SelectValue placeholder="Select target language" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {TARGET_LANGUAGES.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code} className="font-medium">
-                      <span className="mr-2 text-base">{lang.flag}</span>
-                      {lang.name} {lang.code === 'ar' ? '(Default)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                Manga text will be cleared and replaced with this language.
-              </p>
-            </div>
-
-            {/* SFX and OCR Toggles */}
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center space-x-3 p-2.5 rounded-xl bg-muted/40 border border-border/60 hover:bg-muted/60 transition-colors">
-                <Checkbox
-                  id="extract-sfx"
-                  checked={config.extractSFX}
-                  onCheckedChange={(checked) => onConfigChange({ extractSFX: !!checked })}
-                  className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600 rounded-md"
-                />
-                <div className="grid gap-0.5 leading-none cursor-pointer" onClick={() => onConfigChange({ extractSFX: !config.extractSFX })}>
-                  <Label
-                    htmlFor="extract-sfx"
-                    className="text-sm font-semibold cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Volume2 className="w-3.5 h-3.5 text-orange-500" />
-                    Extract Sound Effects (SFX)
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Translates onomatopoeia (e.g. ドドド, 쾅, BOOM) alongside speech bubbles.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3 p-2.5 rounded-xl bg-muted/40 border border-border/60 hover:bg-muted/60 transition-colors">
-                <Checkbox
-                  id="vertical-text"
-                  checked={config.detectVerticalText}
-                  onCheckedChange={(checked) => onConfigChange({ detectVerticalText: !!checked })}
-                  className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600 rounded-md"
-                />
-                <div className="grid gap-0.5 leading-none cursor-pointer" onClick={() => onConfigChange({ detectVerticalText: !config.detectVerticalText })}>
-                  <Label
-                    htmlFor="vertical-text"
-                    className="text-sm font-semibold cursor-pointer flex items-center gap-1.5"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-blue-500" />
-                    Vertical Text & Right-to-Left Auto Detect
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Automatically scans vertical Japanese manga reading flow.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Prominent Analyze Button */}
-          <div className="mt-6 pt-5 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
-              <span>Processes OCR, Text Inpainting & Translation in a single step</span>
-            </div>
-
-            <Button
-              type="button"
-              disabled={!imagePreview || isAnalyzing}
-              onClick={onAnalyze}
-              className="w-full sm:w-auto px-8 h-12 rounded-xl font-bold text-base bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white shadow-lg shadow-orange-600/25 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-muted-foreground uppercase">{t.targetLang}</label>
+            <Select
+              value={config.targetLanguage}
+              onValueChange={(val) => onConfigChange({ targetLanguage: val })}
             >
-              {isAnalyzing ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  Analyzing Page...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  Analyze Image
-                  <ArrowRight className="w-4 h-4 ml-1" />
-                </span>
-              )}
-            </Button>
+              <SelectTrigger className="h-10 text-xs font-bold">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                <SelectItem value="en">الإنجليزية (English)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 bg-muted/20 p-3 rounded-xl border border-border/50">
+              <Checkbox
+                id="sfx"
+                checked={config.extractSFX}
+                onCheckedChange={(checked) => onConfigChange({ extractSFX: !!checked })}
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <label htmlFor="sfx" className="text-xs font-bold cursor-pointer text-foreground block">
+                  {t.sfxLabel}
+                </label>
+                <p className="text-[11px] text-muted-foreground">{t.sfxSub}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 bg-muted/20 p-3 rounded-xl border border-border/50">
+              <Checkbox
+                id="vertical"
+                checked={config.detectVerticalText}
+                onCheckedChange={(checked) => onConfigChange({ detectVerticalText: !!checked })}
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <label htmlFor="vertical" className="text-xs font-bold cursor-pointer text-foreground block">
+                  {t.verticalLabel}
+                </label>
+                <p className="text-[11px] text-muted-foreground">{t.verticalSub}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+            {t.infoNote}
+          </p>
+
+          <Button
+            onClick={onAnalyze}
+            disabled={isAnalyzing || !imagePreview}
+            className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 px-8 rounded-xl gap-2 shadow-lg shadow-orange-500/10"
+          >
+            {isAnalyzing ? t.analyzingBtn : t.analyzeBtn}
+          </Button>
+        </div>
       </Card>
     </div>
   );
-};
+}

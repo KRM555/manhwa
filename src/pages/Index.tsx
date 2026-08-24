@@ -1,3 +1,4 @@
+import { AuthModal } from '@/components/AuthModal';
 import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { TranslationConfig } from '@/types/manga';
@@ -591,6 +592,8 @@ export default function Index() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        {/* زر تسجيل الدخول والبروفايل */}
+  <AuthModal />
           {/* زر مشروع جديد */}
           <Button
             variant="outline"

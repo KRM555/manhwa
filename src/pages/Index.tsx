@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import UploadZone from '@/components/UploadZone';
-import { TranslationConfig } from '@/types/manga';
-import { ArrowLeft, Download, Save } from 'lucide-react';
+import { UploadZone } from '@/components/UploadZone';
+import { TranslationConfig, SampleManga } from '@/types/manga';
+import { ArrowLeft, Download, Save, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,11 +23,6 @@ const CATEGORIES = [
   { value: 'anger', label: 'غضب (Anger)' },
   { value: 'fear', label: 'خوف (Fear)' },
   { value: 'tension', label: 'توتر (Tension)' },
-  { value: 'pleasure', label: 'متعة (Pleasure)' },
-  { value: 'monster', label: 'وحش (Monster)' },
-  { value: 'system', label: 'نظام (System)' },
-  { value: 'phone', label: 'هاتف (Phone)' },
-  { value: 'message', label: 'رسالة (Message)' },
   { value: 'sfx', label: 'مؤثر صوتي (SFX)' },
   { value: 'narrator', label: 'راوي (Narrator)' },
   { value: 'other', label: 'أخرى (Other)' },
@@ -35,37 +30,82 @@ const CATEGORIES = [
 
 export default function Index() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [view, setView] = useState<'upload' | 'results'>('upload');
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
-  // المفتاح واللغة المفترضة (يمكنك ربطهما بحالة إعدادات التطبيق لديك)
-  const [apiKey, setApiKey] = useState<string>(localStorage.getItem('gemini_api_key') || '');
-  const [targetLang, setTargetLang] = useState<string>('ar');
-  const [isOcrOnly, setIsOcrOnly] = useState<boolean>(false);
+  // إعدادات الترجمة
+  const [config, setConfig] = useState<TranslationConfig>({
+    targetLanguage: 'ar',
+    extractSFX: true,
+    detectVerticalText: true,
+  });
 
   const [items, setItems] = useState<ExtractedText[]>([]);
 
-  // استلام نتائج معالجة Gemini من مكون UploadZone
-  const handlePagesLoaded = (pages: any[]) => {
-    if (!pages || pages.length === 0) return;
+  // معالجة اختيار الصورة
+  const handleImageSelected = (url: string, name: string, sampleData?: SampleManga) => {
+    setImagePreview(url);
+    setFileName(name);
 
-    const firstPage = pages[0];
-    setImagePreview(firstPage.imageUrl || null);
+    // إذا كانت من العينات المسجلة وكان بها نصوص مسبقة
+    if (sampleData && (sampleData as any).items) {
+      setItems((sampleData as any).items);
+    }
+  };
 
-    // دمج نصوص الصفحات إذا تم رفع أكثر من صورة أو أخذ الصفحة الأولى
-    const extractedItems: ExtractedText[] = (firstPage.items || firstPage.blocks || []).map(
-      (item: any, idx: number) => ({
-        id: item.id || `text_${idx}`,
-        originalText: item.originalText || item.original || '',
-        translatedText: item.translatedText || item.translated || item.text || '',
-        category: item.category || item.type || 'dialogue',
-      })
-    );
+  // مسح الصورة
+  const handleClearImage = () => {
+    setImagePreview(null);
+    setFileName(null);
+    setItems([]);
+  };
 
-    setItems(extractedItems);
+  // تحديث الإعدادات
+  const handleConfigChange = (updated: Partial<TranslationConfig>) => {
+    setConfig((prev) => ({ ...prev, ...updated }));
+  };
 
-    // إذا اكتمل الاستخراج تحول لصفحة النتائج تلقائياً
-    if (firstPage.status === 'completed') {
+  // دالة التحليل واستخراج النصوص (ربط API أو المحاكاة)
+  const handleAnalyze = async () => {
+    if (!imagePreview) {
+      toast.error('الرجاء اختيار صورة أولاً');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    toast.info('جاري تحليل الصفحة واستخراج النصوص...');
+
+    try {
+      // هنا يمكنك استدعاء API الـ Gemini الخارجي الخاص بك إما عبر fetch أو عبر مكتبة SDK
+      // مثال وهمي حتى تضع الـ API الخاص بك:
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // في حال عدم وجود عناصر مسبقة، نضع نموذج افتراضي للبيانات المستخرجة
+      if (items.length === 0) {
+        setItems([
+          {
+            id: '1',
+            originalText: '何！？そんなバカな…！',
+            translatedText: 'ماذا!؟ هذا مستحيل...!',
+            category: 'scream',
+          },
+          {
+            id: '2',
+            originalText: '俺が必ずお前を倒す。',
+            translatedText: 'سأهزمك بالتأكيد.',
+            category: 'dialogue',
+          },
+        ]);
+      }
+
+      toast.success('تم تحليل الصفحة بنجاح!');
       setView('results');
+    } catch (error) {
+      toast.error('حدث خطأ أثناء تحليل الصورة');
+      console.error(error);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -76,7 +116,7 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-background text-foreground p-4 sm:p-8 max-w-7xl mx-auto dir-rtl">
       {/* Header */}
       <header className="mb-8 flex items-center justify-between border-b border-border pb-4">
         <div>
@@ -87,19 +127,21 @@ export default function Index() {
         </div>
       </header>
 
-      {/* View Switcher */}
+      {/* Main Content */}
       {view === 'upload' ? (
-        <div className="space-y-4">
-          <UploadZone
-            apiKey={apiKey}
-            targetLang={targetLang}
-            isOcrOnly={isOcrOnly}
-            onPagesLoaded={handlePagesLoaded}
-          />
-        </div>
+        <UploadZone
+          imagePreview={imagePreview}
+          fileName={fileName}
+          config={config}
+          isAnalyzing={isAnalyzing}
+          onImageSelected={handleImageSelected}
+          onClearImage={handleClearImage}
+          onConfigChange={handleConfigChange}
+          onAnalyze={handleAnalyze}
+        />
       ) : (
         <div className="space-y-6">
-          {/* Header Bar */}
+          {/* Controls Bar */}
           <div className="flex items-center justify-between bg-card p-4 rounded-2xl border border-border">
             <Button variant="outline" onClick={() => setView('upload')} className="gap-2">
               <ArrowLeft className="w-4 h-4" /> العودة للرفع
@@ -109,29 +151,30 @@ export default function Index() {
                 <Save className="w-4 h-4" /> حفظ المسودة
               </Button>
               <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
-                <Download className="w-4 h-4" /> تصدير
+                <Download className="w-4 h-4" /> تصدير النصوص
               </Button>
             </div>
           </div>
 
-          {/* Side by Side Grid */}
+          {/* Results Display */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Image Preview */}
             <Card className="rounded-2xl overflow-hidden border-border">
               <CardContent className="p-4 flex items-center justify-center bg-zinc-950/5 min-h-[500px]">
-                {imagePreview ? (
+                {imagePreview && (
                   <img
                     src={imagePreview}
-                    alt="Uploaded Page"
+                    alt="Manga Page"
                     className="max-h-[700px] w-auto object-contain rounded-lg shadow-md"
                   />
-                ) : (
-                  <p className="text-sm text-muted-foreground">لا توجد صورة معروضة</p>
                 )}
               </CardContent>
             </Card>
 
-            <div className="space-y-4 max-h-[750px] overflow-y-auto pr-2">
-              <h3 className="font-bold text-lg text-foreground">
+            {/* Extracted Text List */}
+            <div className="space-y-4 max-h-[750px] overflow-y-auto pl-2">
+              <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-orange-500" />
                 النصوص المستخرجة ({items.length})
               </h3>
 

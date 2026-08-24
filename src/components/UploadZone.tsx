@@ -29,8 +29,8 @@ export async function extractTextWithGemini(
     throw new Error("يرجى إدخال API Key الخاص بـ Gemini أولاً من الإعدادات");
   }
 
-  // الموديل الرسمي المستقر لـ REST API (gemini-1.5-flash)
- const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${cleanKey}`;
+  // التحديث للموديل المطلوبة gemini-3.6-flash
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${cleanKey}`;
 
   const response = await fetch(url, {
     method: 'POST',

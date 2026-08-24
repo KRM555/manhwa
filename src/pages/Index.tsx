@@ -35,7 +35,6 @@ const CATEGORIES = [
   { value: 'other', label: 'أخرى (Other)' },
 ];
 
-// قائمة الموديلات المحدثة حسب توصية API
 const CANDIDATE_MODELS = [
   'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
@@ -83,6 +82,44 @@ export default function Index() {
   const handleSaveApiKey = (key: string) => {
     setApiKey(key);
     localStorage.setItem('gemini_api_key', key);
+  };
+
+  // 1. تفعيل حفظ المسودة
+  const handleSaveDraft = () => {
+    if (items.length === 0) {
+      toast.error('لا توجد نصوص لحفظها كمسودة');
+      return;
+    }
+    localStorage.setItem('manga_draft_items', JSON.stringify(items));
+    toast.success('تم حفظ المسودة بنجاح في ذاكرة المتصفح!');
+  };
+
+  // 2. تفعيل تصدير النصوص إلى ملف TXT
+  const handleExport = () => {
+    if (items.length === 0) {
+      toast.error('لا توجد نصوص لتصديرها');
+      return;
+    }
+
+    const fileContent = items
+      .map((item, idx) => {
+        const catLabel = CATEGORIES.find((c) => c.value === item.category)?.label || item.category;
+        return `[فقرة #${idx + 1}] - (${catLabel})\nالنص الأصلي: ${item.originalText}\nالترجمة: ${item.translatedText}\n----------------------------------------`;
+      })
+      .join('\n\n');
+
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const cleanName = fileName ? fileName.replace(/\.[^/.]+$/, '') : 'manga_translation';
+    link.download = `${cleanName}_translated.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success('تم تصدير ملف النصوص بنجاح!');
   };
 
   const handleAnalyze = async () => {
@@ -246,10 +283,14 @@ export default function Index() {
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} /> إعادة التحليل
               </Button>
-              <Button variant="secondary" className="gap-2 text-xs">
+              
+              {/* زر حفظ المسودة */}
+              <Button variant="secondary" onClick={handleSaveDraft} className="gap-2 text-xs">
                 <Save className="w-4 h-4" /> حفظ المسودة
               </Button>
-              <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold">
+
+              {/* زر تصدير النصوص */}
+              <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs font-bold">
                 <Download className="w-4 h-4" /> تصدير النصوص
               </Button>
             </div>

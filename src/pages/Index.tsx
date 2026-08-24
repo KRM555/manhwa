@@ -35,11 +35,10 @@ const CATEGORIES = [
   { value: 'other', label: 'أخرى (Other)' },
 ];
 
-// قائمة الموديلات المرشحة للعمل بالترتيب
+// قائمة الموديلات المحدثة حسب توصية API
 const CANDIDATE_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash-latest',
-  'gemini-2.0-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
 ];
 
 export default function Index() {
@@ -86,7 +85,6 @@ export default function Index() {
     localStorage.setItem('gemini_api_key', key);
   };
 
-  // دالة التحليل مع تجربة عدة موديلات تلقائياً
   const handleAnalyze = async () => {
     if (!imagePreview) {
       toast.error('الرجاء اختيار صورة أولاً');
@@ -99,7 +97,7 @@ export default function Index() {
     }
 
     setIsAnalyzing(true);
-    toast.info('جاري الاتصال بـ Gemini واستخرج النصوص...');
+    toast.info('جاري الاتصال بـ Gemini واستخراج النصوص...');
 
     const mimeTypeMatch = imagePreview.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
@@ -120,7 +118,6 @@ export default function Index() {
     let success = false;
     let lastErrorMsg = '';
 
-    // تجربة الموديلات المتاحة واحدًا تلو الآخر
     for (const model of CANDIDATE_MODELS) {
       try {
         const response = await fetch(
@@ -161,7 +158,7 @@ export default function Index() {
         if (!response.ok) {
           const errJson = await response.json();
           lastErrorMsg = errJson.error?.message || `Model ${model} failed`;
-          continue; // تجربة الموديل التالي عند الفشل
+          continue;
         }
 
         const data = await response.json();
@@ -178,7 +175,7 @@ export default function Index() {
           toast.success(`تم استخراج وترجمة ${formattedItems.length} فقرة بنجاح!`);
           setView('results');
           success = true;
-          break; // خروج من الحلقة فور النجاح
+          break;
         }
       } catch (err: any) {
         lastErrorMsg = err.message || 'Network error';

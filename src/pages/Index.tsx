@@ -85,7 +85,7 @@ export default function Index() {
     localStorage.setItem('gemini_api_key', key);
   };
 
-  // دالة التحليل والاستخراج باستخدام Gemini REST API المباشر (بدون مكتبات خارجية)
+  // دالة التحليل واستخراج النصوص باستخدام Gemini REST API
   const handleAnalyze = async () => {
     if (!imagePreview) {
       toast.error('الرجاء اختيار صورة أولاً');
@@ -117,8 +117,9 @@ export default function Index() {
         ${config.extractSFX ? '4. احرص على استخراج كافة المؤثرات الصوتية (SFX).' : '4. تجاهل المؤثرات الصوتية غير المكتوبة بداخل فقاعات.'}
       `;
 
+      // تم التحديث إلى gemini-1.5-flash المستقر
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`,
         {
           method: 'POST',
           headers: {

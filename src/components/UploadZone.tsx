@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -12,152 +12,62 @@ interface UploadZoneProps {
 }
 
 interface GeminiTextItem {
-  originalText?: string;
-  translatedText?: string;
-  category?: string;
+  originalText: string;
+  translatedText: string;
+  category: 'dialogue' | 'thought' | 'sfx' | 'system';
 }
 
-const normalizeCategory = (category: string | undefined) => {
-  const value = (category || '').toLowerCase().trim();
+type TextCategory =
+  | 'dialogue'
+  | 'thought'
+  | 'sfx'
+  | 'system';
 
-  if (
-    value === 'dialogue' ||
-    value === 'thought' ||
-    value === 'sfx' ||
-    value === 'system'
-  ) {
-    return value;
-  }
-
-  if (
-    value.includes('thought') ||
-    value.includes('thinking') ||
-    value.includes('inner')
-  ) {
-    return 'thought';
-  }
-
-  if (
-    value.includes('sound') ||
-    value.includes('effect') ||
-    value.includes('sfx')
-  ) {
-    return 'sfx';
-  }
-
-  if (
-    value.includes('system') ||
-    value.includes('ui') ||
-    value.includes('interface')
-  ) {
-    return 'system';
-  }
-
-  return 'dialogue';
-};
-
-const extractJsonFromResponse = (text: string): any[] => {
-  if (!text || typeof text !== 'string') {
-    throw new Error('Gemini لم يُرجع أي نص');
-  }
-
-  let cleaned = text.trim();
-
-  // إزالة Markdown code fences إن وجدت
-  cleaned = cleaned
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```$/i, '')
+/**
+ * توحيد نوع التصنيف القادم من Gemini
+ */
+const normalizeCategory = (
+  category?: string
+): TextCategory => {
+  const value = (category || '')
+    .toLowerCase()
     .trim();
 
-  // المحاولة الأولى: JSON مباشر
-  try {
-    const parsed = JSON.parse(cleaned);
+  switch (value) {
+    case 'thought':
+    case 'thoughts':
+    case 'inner':
+    case 'inner monologue':
+      return 'thought';
 
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
+    case 'sfx':
+    case 'sound':
+    case 'sound effect':
+    case 'sound_effect':
+      return 'sfx';
 
-    if (Array.isArray(parsed.blocks)) {
-      return parsed.blocks;
-    }
+    case 'system':
+    case 'system text':
+    case 'ui':
+    case 'interface':
+      return 'system';
 
-    if (Array.isArray(parsed.items)) {
-      return parsed.items;
-    }
-
-    if (Array.isArray(parsed.results)) {
-      return parsed.results;
-    }
-  } catch {
-    // ننتقل لمحاولة استخراج الـ JSON من النص
+    case 'dialogue':
+    default:
+      return 'dialogue';
   }
-
-  // البحث عن JSON array داخل الرد
-  const arrayStart = cleaned.indexOf('[');
-  const arrayEnd = cleaned.lastIndexOf(']');
-
-  if (arrayStart !== -1 && arrayEnd !== -1 && arrayEnd > arrayStart) {
-    const jsonArray = cleaned.substring(arrayStart, arrayEnd + 1);
-
-    try {
-      const parsed = JSON.parse(jsonArray);
-
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    } catch {
-      // continue
-    }
-  }
-
-  // البحث عن JSON object
-  const objectStart = cleaned.indexOf('{');
-  const objectEnd = cleaned.lastIndexOf('}');
-
-  if (
-    objectStart !== -1 &&
-    objectEnd !== -1 &&
-    objectEnd > objectStart
-  ) {
-    const jsonObject = cleaned.substring(
-      objectStart,
-      objectEnd + 1
-    );
-
-    try {
-      const parsed = JSON.parse(jsonObject);
-
-      if (Array.isArray(parsed.blocks)) {
-        return parsed.blocks;
-      }
-
-      if (Array.isArray(parsed.items)) {
-        return parsed.items;
-      }
-
-      if (Array.isArray(parsed.results)) {
-        return parsed.results;
-      }
-    } catch {
-      // continue
-    }
-  }
-
-  console.error('RAW GEMINI RESPONSE:', text);
-
-  throw new Error(
-    'تم استلام رد من Gemini لكن لم يمكن تحويله إلى JSON صحيح'
-  );
 };
 
+/**
+ * استخراج وتحويل النص باستخدام Gemini
+ */
 export async function extractTextWithGemini(
   imageBase64: string,
   apiKey: string,
   targetLang: string,
   isOcrOnly: boolean,
   mimeType: string = 'image/jpeg'
-) {
+): Promise<GeminiTextItem[]> {
   const cleanKey = apiKey?.trim();
 
   if (!cleanKey) {
@@ -166,11 +76,19 @@ export async function extractTextWithGemini(
     );
   }
 
-  // إزالة الجزء الخاص بـ data:image/...;base64,
+  /**
+   * إزالة:
+   * data:image/png;base64,
+   * أو
+   * data:image/jpeg;base64,
+   */
   const cleanBase64 = imageBase64.includes(',')
     ? imageBase64.split(',')[1]
     : imageBase64;
 
+  /**
+   * تحديد اللغة المطلوبة
+   */
   const targetLanguageName =
     targetLang === 'ar'
       ? 'Arabic'
@@ -178,111 +96,139 @@ export async function extractTextWithGemini(
       ? 'English'
       : targetLang;
 
-  const promptText = isOcrOnly
-    ? `
+  /**
+   * Prompt الخاص بـ OCR فقط
+   */
+  const ocrPrompt = `
 You are a highly accurate OCR engine specialized in Manga, Manhwa, Webtoon and Comics.
 
 Analyze the uploaded image carefully.
 
 Extract EVERY visible text element in natural reading order.
 
-Classify each text element into exactly one of:
+Classify every text element into exactly one category:
+
 - dialogue
 - thought
 - sfx
 - system
 
-Return ONLY valid JSON.
-Do NOT use markdown.
-Do NOT add explanations.
-Do NOT add comments.
+Definitions:
 
-Use exactly this format:
+dialogue:
+Spoken dialogue inside speech bubbles.
 
-[
-  {
-    "originalText": "exact original text",
-    "translatedText": "same as original text",
-    "category": "dialogue"
-  }
-]
+thought:
+Inner monologue, thoughts or internal narration.
 
-Important:
-- Extract all visible text, including speech bubbles, narration, system windows and sound effects.
-- Preserve the original text as accurately as possible.
-- Never return an empty array if readable text exists.
-`
-    : `
-You are a professional Manga, Manhwa, Webtoon and Comics OCR and translation engine.
+sfx:
+Sound effects and action sounds.
 
-Analyze the uploaded image very carefully.
+system:
+Game UI, status windows, missions, notifications,
+statistics, skill descriptions and system messages.
 
-Your job:
-1. Extract EVERY visible text element in natural reading order.
-2. Preserve the original text accurately.
-3. Translate every text element naturally into ${targetLanguageName}.
-4. Classify each element into exactly one of:
-   - dialogue
-   - thought
-   - sfx
-   - system
+Important rules:
 
-Return ONLY valid JSON.
-Do NOT use markdown.
-Do NOT add explanations.
-Do NOT add comments.
-Do NOT wrap the response in \`\`\`.
-
-Use exactly this format:
-
-[
-  {
-    "originalText": "original text",
-    "translatedText": "translated text",
-    "category": "dialogue"
-  }
-]
-
-Translation rules:
-- dialogue: natural spoken dialogue
-- thought: internal thoughts
-- sfx: translate the sound effect naturally
-- system: system messages, game interfaces, notifications, status windows
-
-Important:
-- Extract ALL readable text from the image.
-- Never return an empty array if readable text exists.
-- Do not merge unrelated speech bubbles.
-- Keep each text block as a separate object.
-- Return valid JSON only.
+- Extract ALL readable text.
+- Do not skip small text.
+- Do not merge unrelated text blocks.
+- Keep separate speech bubbles as separate items.
+- Preserve line breaks where meaningful.
+- For OCR mode, translatedText must contain the same
+  content as originalText.
 `;
 
-  /*
-   * Official current Gemini model endpoint.
-   * You can change MODEL_NAME if you want another model.
+  /**
+   * Prompt الخاص بالاستخراج والترجمة
+   */
+  const translationPrompt = `
+You are a professional Manga, Manhwa, Webtoon and Comic
+OCR and translation engine.
+
+Analyze the uploaded image carefully.
+
+For EVERY visible text element:
+
+1. Extract the original text accurately.
+2. Translate it naturally into ${targetLanguageName}.
+3. Classify it into exactly one category:
+
+- dialogue
+- thought
+- sfx
+- system
+
+Classification rules:
+
+dialogue:
+Spoken dialogue in speech bubbles.
+
+thought:
+Inner monologue, thoughts or internal narration.
+
+sfx:
+Sound effects, impact sounds and action sounds.
+
+system:
+Game interfaces, missions, statistics,
+status windows, skill descriptions,
+notifications and system messages.
+
+Translation rules:
+
+- Translate naturally according to the context.
+- Preserve the meaning and tone.
+- Do not omit readable text.
+- Do not merge separate text blocks.
+- Keep every independent speech bubble or text region
+  as a separate item.
+- Preserve useful line breaks.
+- For system text, preserve numbers, levels,
+  statistics and game terminology accurately.
+- For SFX, translate the sound naturally when possible.
+
+Important:
+
+Extract ALL readable text from the image.
+Never intentionally return an empty result if text exists.
+`;
+
+  const promptText = isOcrOnly
+    ? ocrPrompt
+    : translationPrompt;
+
+  /**
+   * Gemini Model
    */
   const MODEL_NAME = 'gemini-3.6-flash';
 
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/` +
-    `${MODEL_NAME}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+    `${MODEL_NAME}:generateContent?key=${encodeURIComponent(
+      cleanKey
+    )}`;
 
   let response: Response;
 
   try {
     response = await fetch(url, {
       method: 'POST',
+
       headers: {
         'Content-Type': 'application/json',
       },
+
       body: JSON.stringify({
         contents: [
           {
             role: 'user',
+
             parts: [
               {
                 text: promptText,
               },
+
               {
                 inline_data: {
                   mime_type: mimeType,
@@ -294,212 +240,453 @@ Important:
         ],
 
         generationConfig: {
+          /**
+           * إجبار Gemini على إخراج JSON
+           */
           response_mime_type: 'application/json',
+
+          /**
+           * Structured Output Schema
+           *
+           * هذه أهم إضافة لحل مشكلة JSON.parse
+           */
+          response_schema: {
+            type: 'ARRAY',
+
+            items: {
+              type: 'OBJECT',
+
+              properties: {
+                originalText: {
+                  type: 'STRING',
+
+                  description:
+                    'The exact original text extracted from the manga image.',
+                },
+
+                translatedText: {
+                  type: 'STRING',
+
+                  description:
+                    'The translated version of the original text.',
+                },
+
+                category: {
+                  type: 'STRING',
+
+                  enum: [
+                    'dialogue',
+                    'thought',
+                    'sfx',
+                    'system',
+                  ],
+
+                  description:
+                    'The category of this manga text block.',
+                },
+              },
+
+              required: [
+                'originalText',
+                'translatedText',
+                'category',
+              ],
+            },
+          },
+
           temperature: 0.1,
         },
       }),
     });
-  } catch (networkError: any) {
-    console.error('NETWORK ERROR:', networkError);
+  } catch (networkError) {
+    console.error(
+      'NETWORK ERROR:',
+      networkError
+    );
 
     throw new Error(
-      'تعذر الاتصال بـ Gemini API. تحقق من الإنترنت أو من إعدادات API Key.'
+      'تعذر الاتصال بـ Gemini API. تحقق من اتصال الإنترنت.'
     );
   }
 
-  let resData: any = {};
+  let resData: any;
 
   try {
     resData = await response.json();
-  } catch {
+  } catch (error) {
+    console.error(
+      'RESPONSE JSON ERROR:',
+      error
+    );
+
     throw new Error(
-      `Gemini API أرجع استجابة غير قابلة للقراءة (${response.status})`
+      `تعذر قراءة استجابة Gemini. HTTP Status: ${response.status}`
     );
   }
 
-  console.log('FULL GEMINI RESPONSE:', resData);
+  /**
+   * عرض الرد الكامل في Console
+   */
+  console.log(
+    'FULL GEMINI RESPONSE:',
+    resData
+  );
 
+  /**
+   * معالجة أخطاء API
+   */
   if (!response.ok) {
+    console.error(
+      'GEMINI API ERROR:',
+      resData
+    );
+
     const errorMessage =
       resData?.error?.message ||
-      `فشل الاتصال بـ Gemini API. HTTP ${response.status}`;
-
-    console.error('GEMINI API ERROR:', resData);
+      `فشل Gemini API. HTTP ${response.status}`;
 
     throw new Error(errorMessage);
   }
 
-  // التحقق من وجود candidates
+  /**
+   * التأكد من وجود نتيجة
+   */
   if (
     !resData?.candidates ||
     !Array.isArray(resData.candidates) ||
     resData.candidates.length === 0
   ) {
-    console.error('NO CANDIDATES:', resData);
+    console.error(
+      'NO CANDIDATES:',
+      resData
+    );
+
+    const promptBlockReason =
+      resData?.promptFeedback?.blockReason;
+
+    if (promptBlockReason) {
+      throw new Error(
+        `تم حظر الطلب: ${promptBlockReason}`
+      );
+    }
 
     throw new Error(
-      'Gemini لم يُرجع أي نتيجة. تحقق من API Key أو حدود الاستخدام.'
+      'Gemini لم يُرجع أي نتيجة.'
     );
   }
 
-  // جمع النص من كل parts بدل الاعتماد على أول part فقط
+  /**
+   * استخراج كل النصوص من Parts
+   */
   const parts =
-    resData.candidates?.[0]?.content?.parts || [];
+    resData.candidates[0]?.content?.parts || [];
 
   const textResult = parts
-    .filter((part: any) => typeof part.text === 'string')
-    .map((part: any) => part.text)
+    .filter(
+      (part: any) =>
+        typeof part?.text === 'string'
+    )
+    .map(
+      (part: any) => part.text
+    )
     .join('')
     .trim();
 
-  console.log('GEMINI TEXT RESULT:', textResult);
+  /**
+   * عرض النص النهائي في Console
+   */
+  console.log(
+    'GEMINI TEXT RESULT:',
+    textResult
+  );
 
   if (!textResult) {
     const finishReason =
-      resData.candidates?.[0]?.finishReason;
+      resData.candidates[0]?.finishReason;
 
-    console.error('EMPTY GEMINI RESULT:', resData);
+    console.error(
+      'EMPTY GEMINI RESULT:',
+      resData
+    );
 
     throw new Error(
-      `Gemini لم يُرجع نصًا. Finish reason: ${
-        finishReason || 'unknown'
+      `Gemini لم يُرجع نصًا. Finish Reason: ${
+        finishReason || 'Unknown'
       }`
     );
   }
 
-  const parsedItems = extractJsonFromResponse(textResult);
+  /**
+   * تحويل JSON
+   */
+  let parsedResult: any;
 
-  return parsedItems.map((item: GeminiTextItem) => ({
-    originalText:
-      item.originalText ||
-      (item as any).original ||
-      (item as any).sourceText ||
-      '',
+  try {
+    parsedResult = JSON.parse(textResult);
+  } catch (parseError) {
+    console.error(
+      'JSON PARSE ERROR:',
+      parseError
+    );
 
-    translatedText:
-      item.translatedText ||
-      (item as any).translated ||
-      (item as any).translation ||
-      item.originalText ||
-      (item as any).original ||
-      '',
+    console.error(
+      'INVALID RAW RESPONSE:',
+      textResult
+    );
 
-    category: normalizeCategory(
-      item.category ||
-        (item as any).type ||
-        (item as any).classification
-    ),
-  }));
+    throw new Error(
+      'Gemini أرجع بيانات غير قابلة للقراءة كـ JSON.'
+    );
+  }
+
+  /**
+   * Structured Output المتوقع Array
+   */
+  if (!Array.isArray(parsedResult)) {
+    console.error(
+      'EXPECTED ARRAY BUT RECEIVED:',
+      parsedResult
+    );
+
+    throw new Error(
+      'تم استلام JSON لكن بصيغة غير متوقعة.'
+    );
+  }
+
+  /**
+   * تنظيف وتوحيد البيانات
+   */
+  const normalizedItems =
+    parsedResult
+      .filter(
+        (item: any) =>
+          item &&
+          typeof item === 'object'
+      )
+      .map(
+        (item: any): GeminiTextItem => ({
+          originalText:
+            String(
+              item.originalText || ''
+            ),
+
+          translatedText:
+            String(
+              item.translatedText ||
+                item.originalText ||
+                ''
+            ),
+
+          category: normalizeCategory(
+            item.category
+          ),
+        })
+      )
+      .filter(
+        (item: GeminiTextItem) =>
+          item.originalText.trim() !== '' ||
+          item.translatedText.trim() !== ''
+      );
+
+  console.log(
+    'NORMALIZED GEMINI ITEMS:',
+    normalizedItems
+  );
+
+  return normalizedItems;
 }
 
-export const UploadZone: React.FC<UploadZoneProps> = ({
+/**
+ * UploadZone Component
+ */
+export const UploadZone: React.FC<
+  UploadZoneProps
+> = ({
   apiKey,
   targetLang,
   isOcrOnly,
   onPagesLoaded,
   onStartProcessing,
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusText, setStatusText] = useState('');
+  const [isLoading, setIsLoading] =
+    useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [statusText, setStatusText] =
+    useState('');
 
-  const readFileAsDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+  const fileInputRef =
+    useRef<HTMLInputElement>(null);
 
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result);
-        } else {
-          reject(new Error('فشل تحويل الصورة'));
-        }
-      };
+  /**
+   * قراءة الصورة وتحويلها إلى Base64
+   */
+  const readFileAsDataUrl = (
+    file: File
+  ): Promise<string> => {
+    return new Promise(
+      (resolve, reject) => {
+        const reader = new FileReader();
 
-      reader.onerror = () => {
-        reject(new Error('فشل قراءة الصورة'));
-      };
+        reader.onload = () => {
+          if (
+            typeof reader.result ===
+            'string'
+          ) {
+            resolve(reader.result);
+          } else {
+            reject(
+              new Error(
+                'فشل تحويل الصورة'
+              )
+            );
+          }
+        };
 
-      reader.readAsDataURL(file);
-    });
+        reader.onerror = () => {
+          reject(
+            new Error(
+              'فشل قراءة الصورة'
+            )
+          );
+        };
+
+        reader.readAsDataURL(file);
+      }
+    );
   };
 
+  /**
+   * معالجة الملفات
+   */
   const handleFileSelect = async (
     files: FileList | null
   ) => {
-    if (!files || files.length === 0) {
+    if (
+      !files ||
+      files.length === 0
+    ) {
       return;
     }
 
+    /**
+     * التحقق من API Key
+     */
     if (!apiKey?.trim()) {
       toast.error(
         'برجاء إدخال Gemini API Key أولاً من الإعدادات!'
       );
+
       return;
     }
 
-    const imageFiles = Array.from(files).filter((file) =>
-      file.type.startsWith('image/')
-    );
+    /**
+     * السماح بالصور فقط
+     */
+    const imageFiles =
+      Array.from(files).filter(
+        (file) =>
+          file.type.startsWith(
+            'image/'
+          )
+      );
 
     if (imageFiles.length === 0) {
-      toast.error('يرجى اختيار صور فقط');
+      toast.error(
+        'يرجى اختيار صور فقط'
+      );
+
       return;
     }
 
     setIsLoading(true);
 
-    if (typeof onStartProcessing === 'function') {
+    if (
+      typeof onStartProcessing ===
+      'function'
+    ) {
       onStartProcessing();
     }
 
     const pages: any[] = [];
+
     let successfulPages = 0;
     let failedPages = 0;
 
     try {
-      for (let i = 0; i < imageFiles.length; i++) {
-        const file = imageFiles[i];
+      /**
+       * معالجة الصور واحدة واحدة
+       */
+      for (
+        let i = 0;
+        i < imageFiles.length;
+        i++
+      ) {
+        const file =
+          imageFiles[i];
 
         setStatusText(
-          `جاري تحليل وترجمة الصورة (${i + 1}/${imageFiles.length})...`
+          `جاري تحليل وترجمة الصورة ${
+            i + 1
+          } من ${
+            imageFiles.length
+          }...`
         );
 
         try {
-          const base64 = await readFileAsDataUrl(file);
+          /**
+           * تحويل الصورة
+           */
+          const base64 =
+            await readFileAsDataUrl(
+              file
+            );
 
-          const rawItems = await extractTextWithGemini(
-            base64,
-            apiKey,
-            targetLang,
-            isOcrOnly,
-            file.type || 'image/jpeg'
-          );
+          /**
+           * إرسال إلى Gemini
+           */
+          const rawItems =
+            await extractTextWithGemini(
+              base64,
+              apiKey,
+              targetLang,
+              isOcrOnly,
+              file.type ||
+                'image/jpeg'
+            );
 
-          const pageItems = rawItems.map(
-            (item: GeminiTextItem, idx: number) => ({
-              id: `item_${Date.now()}_${i}_${idx}_${Math.random()
-                .toString(36)
-                .slice(2, 7)}`,
+          /**
+           * تجهيز Text Blocks
+           */
+          const pageItems =
+            rawItems.map(
+              (
+                item,
+                index
+              ) => ({
+                id: `item_${Date.now()}_${i}_${index}_${Math.random()
+                  .toString(36)
+                  .slice(2, 8)}`,
 
-              originalText: item.originalText || '',
+                originalText:
+                  item.originalText,
 
-              translatedText:
-                item.translatedText ||
-                item.originalText ||
-                '',
+                translatedText:
+                  item.translatedText,
 
-              category:
-                normalizeCategory(item.category),
+                category:
+                  item.category,
 
-              isEdited: false,
-            })
-          );
+                isEdited: false,
+              })
+            );
 
+          /**
+           * إنشاء الصفحة
+           */
           pages.push({
             id: `page_${Date.now()}_${i}_${Math.random()
               .toString(36)
-              .slice(2, 7)}`,
+              .slice(2, 8)}`,
 
             name: file.name,
 
@@ -508,12 +695,18 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
             items: pageItems,
 
             status: 'completed',
+
+            error: null,
           });
 
           successfulPages++;
 
           console.log(
-            `PAGE ${file.name} RESULTS:`,
+            `SUCCESSFULLY PROCESSED: ${file.name}`
+          );
+
+          console.log(
+            'PAGE ITEMS:',
             pageItems
           );
         } catch (pageError: any) {
@@ -524,18 +717,35 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
             pageError
           );
 
-          // نضيف الصفحة حتى لو فشل Gemini
-          // حتى لا تختفي الصورة
-          const base64 = await readFileAsDataUrl(file);
+          /**
+           * حتى لو فشل Gemini،
+           * نحاول إظهار الصورة للمستخدم
+           */
+          let fallbackImageUrl = '';
+
+          try {
+            fallbackImageUrl =
+              await readFileAsDataUrl(
+                file
+              );
+          } catch (
+            imageReadError
+          ) {
+            console.error(
+              'FALLBACK IMAGE ERROR:',
+              imageReadError
+            );
+          }
 
           pages.push({
-            id: `page_${Date.now()}_${i}_${Math.random()
+            id: `page_error_${Date.now()}_${i}_${Math.random()
               .toString(36)
-              .slice(2, 7)}`,
+              .slice(2, 8)}`,
 
             name: file.name,
 
-            imageUrl: base64,
+            imageUrl:
+              fallbackImageUrl,
 
             items: [],
 
@@ -549,43 +759,68 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
           toast.error(
             `${file.name}: ${
               pageError?.message ||
-              'فشل استخراج النصوص'
+              'حدث خطأ أثناء المعالجة'
             }`
           );
         }
       }
 
+      /**
+       * إرسال الصفحات إلى التطبيق
+       */
       if (pages.length > 0) {
+        console.log(
+          'ALL PAGES:',
+          pages
+        );
+
         onPagesLoaded(pages);
       }
 
-      if (successfulPages > 0 && failedPages === 0) {
+      /**
+       * الرسالة النهائية
+       */
+      if (
+        successfulPages > 0 &&
+        failedPages === 0
+      ) {
         toast.success(
           `تم تحليل وترجمة ${successfulPages} صورة بنجاح!`
         );
-      } else if (successfulPages > 0) {
+      } else if (
+        successfulPages > 0 &&
+        failedPages > 0
+      ) {
         toast.warning(
           `تمت معالجة ${successfulPages} صورة، وفشل ${failedPages} صورة`
         );
       } else {
         toast.error(
-          'فشلت معالجة جميع الصور. افتح Console لمعرفة الخطأ.'
+          'فشلت معالجة جميع الصور. افتح Console لمعرفة السبب.'
         );
       }
     } catch (error: any) {
-      console.error('UPLOAD ERROR:', error);
+      console.error(
+        'UPLOAD ERROR:',
+        error
+      );
 
       toast.error(
         error?.message ||
-        'حدث خطأ غير متوقع أثناء رفع الملفات'
+          'حدث خطأ غير متوقع أثناء رفع الملفات'
       );
     } finally {
       setIsLoading(false);
       setStatusText('');
 
-      // يسمح برفع نفس الملفات مرة أخرى
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      /**
+       * يسمح برفع نفس الصورة مرة أخرى
+       */
+      if (
+        fileInputRef.current
+      ) {
+        fileInputRef.current.value =
+          '';
       }
     }
   };
@@ -595,8 +830,10 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       <input
         type="file"
         ref={fileInputRef}
-        onChange={(e) =>
-          handleFileSelect(e.target.files)
+        onChange={(event) =>
+          handleFileSelect(
+            event.target.files
+          )
         }
         multiple
         accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
@@ -610,6 +847,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
           }
         }}
         className={`
+          w-full
           border-2
           border-dashed
           rounded-2xl

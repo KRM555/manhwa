@@ -207,27 +207,24 @@ Return STRICTLY a raw JSON array of objects:
       <main className="flex-1 w-full px-6 py-6 flex flex-col">
         {view === 'upload' ? (
           <div className="max-w-6xl mx-auto w-full space-y-6 my-auto">
-            {/* Control Panel Card */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                 
                 {/* API Key Section */}
-<div className="md:col-span-2 space-y-2">
-  <div className="flex items-center justify-between">
-    <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
-      <KeyRound className="w-4 h-4 text-orange-400" />
-      Gemini API Key:
-    </label>
-    <a
-      href="https://aistudio.google.com/app/apikey"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-[11px] text-orange-400 hover:text-orange-300 underline font-medium"
-    >
-      احصل على مفتاح مجاني من هنا ↗
-    </a>
-  </div>
+                <div className="md:col-span-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold flex items-center gap-2 text-slate-200">
+                      <KeyRound className="w-4 h-4 text-orange-400" />
+                      Gemini API Key:
+                    </label>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-orange-400 hover:text-orange-300 underline font-medium"
+                    >
+                      احصل على مفتاح مجاني من هنا ↗
+                    </a>
+                  </div>
                   <input
                     type="password"
                     className="w-full p-3.5 text-sm border border-slate-700 rounded-xl bg-slate-950/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 font-mono transition-all"
@@ -266,8 +263,12 @@ Return STRICTLY a raw JSON array of objects:
                     </button>
                   </div>
                 </div>
-<div className="mt-4 pt-3 border-t border-slate-800">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-300">
+
+              </div>
+
+              {/* OCR Toggle Option */}
+              <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-start">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none text-sm text-slate-300 hover:text-white transition-colors">
                   <input
                     type="checkbox"
                     checked={isOcrOnly}
@@ -279,8 +280,6 @@ Return STRICTLY a raw JSON array of objects:
                   </span>
                 </label>
               </div>
-              </div>
-            </div>
 
             {/* Upload Zone */}
             <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-2 shadow-2xl">

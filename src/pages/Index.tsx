@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { ResultsView } from '@/components/ResultsView';
 import { toast } from 'sonner';
-import { KeyRound, BookOpen, Settings2, Moon, Sun, Plus, Trash2, Save, X, Sparkles, Globe, HelpCircle, ScanText, Languages } from 'lucide-react';
+import { KeyRound, BookOpen, Settings2, Moon, Sun, Plus, Trash2, Save, X, Sparkles, Globe, HelpCircle, ScanText, Languages, ExternalLink, ShieldCheck, Zap } from 'lucide-react';
 
 interface TyperRule {
   id: string;
@@ -20,13 +20,11 @@ const DEFAULT_RULES: TyperRule[] = [
   { id: '6', name: 'كلام خارجي', prefix: 'OT:', categoryKey: 'narrator' },
 ];
 
-// نصوص الواجهة المتغيرة فقط (مع ثبات الهيدر والـ Layout)
 const uiTranslations = {
   ar: {
     tagsBtn: "تعديل علامات التايبير",
     apiKeyLabel: "Gemini API Key:",
     apiKeyLink: "احصل على مفتاح مجاني من هنا ↗",
-    apiKeyTooltip: "مفتاح مجاني من Google AI Studio يسمح للموقع بالاتصال بالذكاء الاصطناعي للتعرف على النصوص وترجمتها.",
     targetLangLabel: "لغة الترجمة المطلوبة:",
     modeTranslate: "ترجمة + استخراج (وضع كامل)",
     modeOcrOnly: "استخراج النص فقط (OCR Mode)",
@@ -35,7 +33,6 @@ const uiTranslations = {
     tagsBtn: "Edit Typer Tags",
     apiKeyLabel: "Gemini API Key:",
     apiKeyLink: "Get a free API Key here ↗",
-    apiKeyTooltip: "A free key from Google AI Studio that connects the app to AI for OCR and translation.",
     targetLangLabel: "Target Translation Language:",
     modeTranslate: "Translate + Extract (Full Mode)",
     modeOcrOnly: "Extract Text Only (OCR Mode)",
@@ -54,6 +51,9 @@ export default function Index() {
   const [isOcrOnly, setIsOcrOnly] = useState<boolean>(false);
   const [uiLang, setUiLang] = useState<'ar' | 'en'>('en');
 
+  // Modal State for API Explanation
+  const [isApiHelpOpen, setIsApiHelpOpen] = useState(false);
+
   // Typer Tags Settings State
   const [typerRules, setTyperRules] = useState<TyperRule[]>(() => {
     const saved = localStorage.getItem('typer_rules');
@@ -61,7 +61,6 @@ export default function Index() {
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Save API Key to localStorage
   useEffect(() => {
     localStorage.setItem('gemini_api_key', apiKey);
   }, [apiKey]);
@@ -93,10 +92,9 @@ export default function Index() {
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} transition-colors duration-300 font-sans`}>
       
-      {/* Header Bar - ثابت بالكامل وباتجاه LTR دائماً */}
+      {/* Header Bar */}
       <header className="flex items-center justify-between p-4 bg-slate-900/60 border-b border-slate-800 backdrop-blur-md sticky top-0 z-40" dir="ltr">
         <div className="flex items-center gap-3">
-          {/* UI Language Switcher */}
           <button
             onClick={() => setUiLang(uiLang === 'ar' ? 'en' : 'ar')}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:text-orange-400 text-xs font-bold transition-all shadow-sm"
@@ -105,7 +103,6 @@ export default function Index() {
             <span>{uiLang === 'ar' ? 'العربية (AR)' : 'English (EN)'}</span>
           </button>
 
-          {/* Edit Typer Tags Button */}
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-medium transition-all"
@@ -114,7 +111,6 @@ export default function Index() {
             <span>{uiTranslations[uiLang].tagsBtn}</span>
           </button>
 
-          {/* Theme Toggle */}
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-slate-400 hover:text-amber-400 transition-all"
@@ -123,7 +119,6 @@ export default function Index() {
           </button>
         </div>
 
-        {/* Title & Subtitle ثابتين باللغة الإنجليزية دائماً */}
         <div className="flex items-center gap-3">
           <div className="text-right">
             <h1 className="text-base font-bold text-slate-100 flex items-center justify-end gap-2">
@@ -138,14 +133,13 @@ export default function Index() {
         </div>
       </header>
 
-      {/* Main Container - محاذاة وتخطيط ثابت LTR لمشابهة الصور تماماً */}
+      {/* Main Container */}
       <main className="max-w-6xl mx-auto p-6 space-y-6" dir="ltr">
         
         {view === 'upload' ? (
           <>
-            {/* Control Panel Card */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
+            {/* Control Panel Card بدون overflow-hidden لتجنب قص الشرح */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-sm relative">
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                 
@@ -157,7 +151,7 @@ export default function Index() {
                       {uiTranslations[uiLang].apiKeyLabel}
                     </label>
                     
-                    <div className="flex items-center gap-1.5 relative group">
+                    <div className="flex items-center gap-2 relative">
                       <a
                         href="https://aistudio.google.com/app/apikey"
                         target="_blank"
@@ -167,10 +161,22 @@ export default function Index() {
                         {uiTranslations[uiLang].apiKeyLink}
                       </a>
                       
-                      {/* أيقونة التعجب والشرح (Tooltip) */}
-                      <HelpCircle className="w-3.5 h-3.5 text-slate-400 hover:text-orange-400 cursor-pointer transition-colors" />
-                      <div className="absolute bottom-full right-0 mb-2 w-64 p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-300 shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all z-50 leading-relaxed text-right" dir="rtl">
-                        {uiTranslations[uiLang].apiKeyTooltip}
+                      {/* زر الشرح التفصيلي مع Tooltip منسق لأسفل */}
+                      <div className="relative group">
+                        <button
+                          onClick={() => setIsApiHelpOpen(true)}
+                          type="button"
+                          className="p-1 text-slate-400 hover:text-orange-400 transition-colors focus:outline-none"
+                          title="انقر للشرح التفصيلي"
+                        >
+                          <HelpCircle className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Hover Tooltip موجه لأسفل */}
+                        <div className="absolute top-full right-0 mt-2 w-72 p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 shadow-2xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all z-50 leading-relaxed text-right" dir="rtl">
+                          <p className="font-bold text-orange-400 mb-1">ما هو Gemini API Key؟</p>
+                          <p className="text-[11px] text-slate-400">هو مفتاح ربط مجاني من Google يتيح للموقع استخدام الذكاء الاصطناعي لاستخراج النصوص وترجمتها. اضغط للتعرف على الخطوات.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -217,7 +223,7 @@ export default function Index() {
 
               </div>
 
-              {/* Mode Toggle Bar - استبدال المربع بزر اختيار كبير وأنيق */}
+              {/* Mode Toggle Bar */}
               <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-400">
                   {uiLang === 'ar' ? 'وضع معالجة الصور:' : 'Processing Mode:'}
@@ -275,6 +281,72 @@ export default function Index() {
           />
         )}
       </main>
+
+      {/* Modal الشرح التفصيلي لـ Gemini API Key */}
+      {isApiHelpOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50" dir="rtl">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
+            
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+              <div className="flex items-center gap-2 text-slate-100 font-bold text-base">
+                <KeyRound className="w-5 h-5 text-orange-400" />
+                <span>دليل مفتاح Gemini API المجاني</span>
+              </div>
+              <button
+                onClick={() => setIsApiHelpOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs text-slate-300 leading-relaxed overflow-y-auto max-h-[75vh]">
+              
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 text-orange-300 flex items-start gap-2.5">
+                <Zap className="w-5 h-5 shrink-0 text-orange-400 mt-0.5" />
+                <div>
+                  <p className="font-bold">لماذا نحتاج هذا المفتاح؟</p>
+                  <p className="text-[11px] opacity-90">الموقع يستخدم نموذج الذكاء الاصطناعي (Gemini 1.5 Pro) للتعرف على النصوص داخل المانوا وترجمتها بدقة عالية. المفتاح ربط مجاني وشخصي بينك وبين Google.</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-100 flex items-center gap-1.5 text-sm">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  خطوات الحصول على المفتاح مجاناً:
+                </h4>
+                
+                <ol className="list-decimal list-inside space-y-2 text-slate-400 bg-slate-950/60 p-4 rounded-xl border border-slate-800 font-medium">
+                  <li>افتح موقع <strong className="text-orange-400 font-mono">Google AI Studio</strong>.</li>
+                  <li>قم بتسجيل الدخول باستخدام حساب Gmail الخاص بك.</li>
+                  <li>اضغط على زر <strong className="text-slate-200">"Create API Key"</strong>.</li>
+                  <li>انسخ المفتاح المنشأ وانصقه في الخانة المخصصة داخل المنصة.</li>
+                </ol>
+              </div>
+
+              <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3 space-y-1">
+                <p className="font-semibold text-slate-200">💡 ملاحظات مهمة:</p>
+                <ul className="list-disc list-inside text-slate-400 text-[11px] space-y-1">
+                  <li>المفتاح مجاني بالكامل ولا يحطلب إضافة بطاقة بنكية.</li>
+                  <li>يتم حفظ المفتاح محلياً في متصفحك ولا يتم مشاركته مع أي طرف.</li>
+                </ul>
+              </div>
+
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg shadow-orange-500/20 text-xs"
+              >
+                <span>اللانتقال لتوليد المفتاح الآن (Google AI Studio)</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Typer Tags Settings Modal */}
       {isSettingsOpen && (

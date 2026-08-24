@@ -6,14 +6,10 @@ import {
   Save,
   Sparkles,
   Key,
-  RefreshCw,
-  Sun,
-  Moon,
   Globe,
   Upload,
-  FileArchive,
-  Image as ImageIcon,
-  CheckCircle2,
+  Sun,
+  Moon,
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,7 +17,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
@@ -56,7 +51,6 @@ const CATEGORIES = [
 
 const CANDIDATE_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash'];
 
-// قواميس الترجمة بين العربية والإنجليزية للواجهة
 const I18N = {
   ar: {
     title: 'مستودع ترجمة المانجا والويب تون',
@@ -69,7 +63,6 @@ const I18N = {
     exportBtn: 'تصدير TXT المنسق (لكل الصفحات)',
     saveDraft: 'حفظ المسودة',
     backToUpload: 'العودة للرفع',
-    reAnalyze: 'إعادة التحليل',
     preview: 'معاينة الصفحة',
     extractedTexts: 'النصوص المستخرجة',
     originalText: 'النص الأصلي:',
@@ -90,7 +83,6 @@ const I18N = {
     exportBtn: 'Export Formatted TXT (All Pages)',
     saveDraft: 'Save Draft',
     backToUpload: 'Back to Upload',
-    reAnalyze: 'Re-analyze',
     preview: 'Page Preview',
     extractedTexts: 'Extracted Texts',
     originalText: 'Original Text:',
@@ -145,7 +137,6 @@ export default function Index() {
 
   const t = I18N[lang];
 
-  // إدارة وضع الثيم الداكن والفيزيائي
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') {
@@ -160,7 +151,6 @@ export default function Index() {
     localStorage.setItem('gemini_api_key', key);
   };
 
-  // معالجة ملفات الصور والـ ZIP المرفوعة (حد أقصى 10)
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -170,7 +160,6 @@ export default function Index() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // إذا كان الملف ZIP
       if (file.name.endsWith('.zip') || file.type.includes('zip')) {
         try {
           const zip = new JSZip();
@@ -209,8 +198,7 @@ export default function Index() {
       toast.warning(t.maxImagesError);
     }
 
-    const updatedPages = [...pages, ...newPages].slice(0, 10);
-    setPages(updatedPages);
+    setPages((prev) => [...prev, ...newPages].slice(0, 10));
   };
 
   const handleRemovePage = (index: number) => {
@@ -221,9 +209,7 @@ export default function Index() {
     }
   };
 
-  // تحليل صورة واحدة عبر Gemini
   const analyzeSinglePage = async (page: MangaPage): Promise<ExtractedText[]> => {
-    // تحويل Image URL إلى Base64
     const responseImg = await fetch(page.imageUrl);
     const blob = await responseImg.blob();
     const base64Data = await new Promise<string>((resolve) => {
@@ -302,7 +288,6 @@ export default function Index() {
     return [];
   };
 
-  // بدء تحليل كافة الصفحات المرفوعة
   const handleAnalyzeAll = async () => {
     if (pages.length === 0) {
       toast.error(t.noImages);
@@ -330,7 +315,6 @@ export default function Index() {
     toast.success(lang === 'ar' ? 'تم استخراج كافة الصفحات بنجاح!' : 'All pages extracted successfully!');
   };
 
-  // تصدير الشيت لكافة الصفحات بالترتيب
   const handleExport = () => {
     if (pages.length === 0) return;
 
@@ -343,7 +327,7 @@ export default function Index() {
           .map((item) => formatTextByCategory(item.translatedText, item.category))
           .join('\n\n');
       }
-      fileContent += `\n\n${'='.repeat(30)}\n\n`;
+      fileContent += `\n\n${'=' .repeat(30)}\n\n`;
     });
 
     const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
@@ -379,7 +363,6 @@ export default function Index() {
         lang === 'ar' ? 'dir-rtl' : 'dir-ltr'
       }`}
     >
-      {/* Navbar Header */}
       <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
@@ -389,7 +372,6 @@ export default function Index() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          {/* Key Input */}
           <div className="flex items-center gap-2 border border-border px-2.5 py-1 rounded-lg bg-card">
             <Key className="w-4 h-4 text-orange-500 shrink-0" />
             <Input
@@ -401,7 +383,6 @@ export default function Index() {
             />
           </div>
 
-          {/* Language Toggle */}
           <Button
             variant="outline"
             size="sm"
@@ -412,7 +393,6 @@ export default function Index() {
             {lang === 'ar' ? 'English' : 'العربية'}
           </Button>
 
-          {/* Theme Toggle */}
           <Button
             variant="outline"
             size="sm"
@@ -424,10 +404,8 @@ export default function Index() {
         </div>
       </header>
 
-      {/* Main View Switch */}
       {view === 'upload' ? (
         <div className="space-y-6">
-          {/* File Upload Zone */}
           <Card className="border-2 border-dashed border-border hover:border-orange-500/50 transition-colors p-8 text-center rounded-2xl bg-card/50">
             <input
               type="file"
@@ -448,15 +426,24 @@ export default function Index() {
             </label>
           </Card>
 
-          {/* Config Options */}
           <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-xl border border-border gap-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="extract-only-mode"
-                checked={extractOnly}
-                onCheckedChange={setExtractOnly}
-              />
-              <Label htmlFor="extract-only-mode" className="text-sm font-semibold cursor-pointer">
+            {/* Custom Toggle Switch */}
+            <div
+              className="flex items-center gap-3 cursor-pointer select-none"
+              onClick={() => setExtractOnly(!extractOnly)}
+            >
+              <div
+                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+                  extractOnly ? 'bg-orange-600' : 'bg-muted-foreground/30'
+                }`}
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                    extractOnly ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
+              <Label className="text-sm font-semibold cursor-pointer">
                 {t.extractOnly}
               </Label>
             </div>
@@ -471,7 +458,6 @@ export default function Index() {
             </Button>
           </div>
 
-          {/* Uploaded Thumbnails Grid (Up to 10) */}
           {pages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               {pages.map((page, idx) => (
@@ -496,14 +482,12 @@ export default function Index() {
           )}
         </div>
       ) : (
-        /* Results View */
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-2xl border border-border gap-3">
             <Button variant="outline" onClick={() => setView('upload')} className="gap-2 text-xs font-bold">
               <ArrowLeft className="w-4 h-4" /> {t.backToUpload}
             </Button>
 
-            {/* Pagination Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto max-w-md py-1">
               {pages.map((p, idx) => (
                 <Button
@@ -527,9 +511,7 @@ export default function Index() {
             </div>
           </div>
 
-          {/* Image & Text Editor Split */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Image Preview */}
             <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
               <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
                 <span>{t.preview} - {t.page} {activePageIndex + 1}</span>
@@ -547,7 +529,6 @@ export default function Index() {
               </CardContent>
             </Card>
 
-            {/* Extracted Items */}
             <div className="space-y-4 h-[750px] overflow-y-auto pl-2">
               <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
                 <h3 className="font-bold text-lg text-foreground flex items-center gap-2">

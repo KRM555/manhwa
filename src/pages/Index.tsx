@@ -8,7 +8,7 @@ import {
   Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2,
   ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
   Copy, Check, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
-  BookOpen, Eye, EyeOff
+  BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,8 +21,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
@@ -32,7 +30,7 @@ export interface ExtractedText {
   originalText: string;
   translatedText: string;
   category: string;
-  topPercent?: number; // لإسناد موقع النص تقريبياً على الصورة
+  topPercent?: number;
 }
 
 interface ImageItem {
@@ -106,7 +104,6 @@ const UI_TEXT = {
     tagPrefix: 'البادئة',
     tagSuffix: 'اللاحقة',
     add: 'إضافة',
-    deleteTag: 'حذف العلامة',
     resetDefaultTags: 'استعادة العلامات الافتراضية',
     newProject: 'مشروع جديد',
     copyBlock: 'نسخ الفقرة',
@@ -122,6 +119,9 @@ const UI_TEXT = {
     transTerm: 'الترجمة المعتمدة',
     addGlossary: 'إضافة للقاموس',
     visualOverlay: 'المعاينة البصرية النصية',
+    howToUse: 'كيفية الاستخدام',
+    uploadReference: 'إرفاق ملف ترجمة سابقة كمرجع (اختياري)',
+    referenceUploaded: 'تم إرفاق المرجع:',
   },
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
@@ -155,7 +155,6 @@ const UI_TEXT = {
     tagPrefix: 'Prefix',
     tagSuffix: 'Suffix',
     add: 'Add Tag',
-    deleteTag: 'Delete Tag',
     resetDefaultTags: 'Reset Default Tags',
     newProject: 'New Project',
     copyBlock: 'Copy Block',
@@ -171,6 +170,9 @@ const UI_TEXT = {
     transTerm: 'Approved Translation',
     addGlossary: 'Add to Glossary',
     visualOverlay: 'Visual Text Overlay',
+    howToUse: 'How to Use',
+    uploadReference: 'Upload previous translation reference (Optional)',
+    referenceUploaded: 'Reference uploaded:',
   },
 };
 
@@ -181,7 +183,10 @@ export default function Index() {
   });
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
+  
+  // حالات التحميل ومعالجة الصور
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [currentProcessingMsg, setCurrentProcessingMsg] = useState<string>('');
 
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
@@ -206,7 +211,6 @@ export default function Index() {
     return saved ? JSON.parse(saved) : DEFAULT_TAGS;
   });
 
-  // حالة القاموس (Glossary)
   const [glossary, setGlossary] = useState<GlossaryItem[]>(() => {
     const saved = localStorage.getItem('manga_glossary');
     return saved ? JSON.parse(saved) : [];
@@ -214,7 +218,6 @@ export default function Index() {
   const [newGlossaryOrig, setNewGlossaryOrig] = useState('');
   const [newGlossaryTrans, setNewGlossaryTrans] = useState('');
 
-  // حالة التمييز والمعاينة البصرية
   const [showOverlay, setShowOverlay] = useState<boolean>(false);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
@@ -224,6 +227,10 @@ export default function Index() {
 
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
+
+  // مرجع الترجمة (الملف النصي)
+  const [referenceText, setReferenceText] = useState<string>('');
+  const [referenceFileName, setReferenceFileName] = useState<string>('');
 
   useEffect(() => {
     localStorage.setItem('custom_manga_tags', JSON.stringify(tags));
@@ -301,6 +308,8 @@ export default function Index() {
     setImages([]);
     setActiveImageIndex(0);
     setResultsMap({});
+    setReferenceText('');
+    setReferenceFileName('');
     localStorage.removeItem('manga_studio_results');
     localStorage.removeItem('manga_studio_images');
     toast.success(lang === 'ar' ? 'تم بدء مشروع جديد' : 'New project started');
@@ -309,6 +318,19 @@ export default function Index() {
   const handleSaveApiKey = (key: string) => {
     setApiKey(key);
     localStorage.setItem('gemini_api_key', key);
+  };
+
+  // رفع الملف المرجعي للترجمة
+  const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setReferenceText(event.target?.result as string);
+      setReferenceFileName(file.name);
+      toast.success(lang === 'ar' ? 'تم استيراد المرجع بنجاح!' : 'Reference imported!');
+    };
+    reader.readAsText(file);
   };
 
   const handleAddCustomTag = () => {
@@ -342,7 +364,7 @@ export default function Index() {
     setGlossary([...glossary, item]);
     setNewGlossaryOrig('');
     setNewGlossaryTrans('');
-    toast.success(lang === 'ar' ? 'تمت إضافة المصطلح للقاموس' : 'Glossary term added');
+    toast.success(lang === 'ar' ? 'تمت إضافة المصطلح' : 'Term added');
   };
 
   const handleDeleteGlossaryItem = (id: string) => {
@@ -395,6 +417,7 @@ export default function Index() {
         if (updatedTranslated.includes(findText)) {
           const count = updatedTranslated.split(findText).length - 1;
           totalReplacements += count;
+          // تم استخدام split و join بدلاً من replaceAll لتجنب الأخطاء
           updatedTranslated = updatedTranslated.split(findText).join(replaceText);
         }
         return { ...item, translatedText: updatedTranslated };
@@ -428,6 +451,10 @@ export default function Index() {
       ? `Strictly use this Glossary for translated names/terms: ${glossary.map(g => `${g.original} => ${g.translation}`).join('; ')}.`
       : '';
 
+    const refContextPrompt = referenceText
+      ? `\nIMPORTANT CONTEXT: Use the following text from a previous chapter as a reference to maintain consistent tone, style, and character naming:\n"""\n${referenceText.substring(0, 5000)}\n"""\n`
+      : '';
+
     const promptText = ocrOnly
       ? `Extract all original texts top to bottom. Estimate topPercent (0 to 100) position of each bubble on page. Categorize each block into best matching tag.`
       : `
@@ -436,6 +463,7 @@ export default function Index() {
         Categorize each block into one of these types: (${tags.map(t => t.value).join(', ')}).
         Translate all extracted texts to ${config.targetLanguage === 'ar' ? 'Arabic' : 'English'}.
         ${glossaryPrompt}
+        ${refContextPrompt}
       `;
 
     for (const model of CANDIDATE_MODELS) {
@@ -502,7 +530,7 @@ export default function Index() {
     if (!apiKey.trim()) return toast.error(t.enterApiKey);
 
     setIsAnalyzing(true);
-    toast.info(t.analyzing);
+    setCurrentProcessingMsg(lang === 'ar' ? 'جاري معالجة الصورة الحالية...' : 'Processing current image...');
 
     const res = await processGeminiRequest(activeImage, ocrOnly);
     if (res) {
@@ -510,16 +538,16 @@ export default function Index() {
       toast.success(t.successExtract);
       setView('results');
       if (activeImage) {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        supabase.from('user_history').insert({
-          user_id: session.user.id,
-          image_name: activeImage.name,
-          extracted_count: res.length,
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            supabase.from('user_history').insert({
+              user_id: session.user.id,
+              image_name: activeImage.name,
+              extracted_count: res.length,
+            });
+          }
         });
       }
-    });
-  }
     } else {
       toast.error(lang === 'ar' ? 'حدث خطأ أثناء معالجة الصورة' : 'Failed to process image');
     }
@@ -531,10 +559,11 @@ export default function Index() {
     if (!apiKey.trim()) return toast.error(t.enterApiKey);
 
     setIsAnalyzing(true);
-    toast.info(lang === 'ar' ? `جاري تحليل كل الصور (${images.length})...` : `Analyzing all ${images.length} images...`);
-
+    
     const newMap = { ...resultsMap };
-    for (const img of images) {
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      setCurrentProcessingMsg(lang === 'ar' ? `جاري معالجة الصورة (${i + 1} من ${images.length})...` : `Processing image (${i + 1} of ${images.length})...`);
       const res = await processGeminiRequest(img, ocrOnly);
       if (res) newMap[img.id] = res;
     }
@@ -595,7 +624,7 @@ export default function Index() {
   return (
     <div className={`min-h-screen bg-background text-foreground p-4 sm:p-8 w-full max-w-[1550px] mx-auto ${lang === 'ar' ? 'dir-rtl' : 'dir-ltr'}`}>
       {/* Header */}
-      <header className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
+      <header className="mb-6 flex flex-col xl:flex-row items-start xl:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-orange-600 dark:text-orange-500">
             Manhwa Transtool Studio
@@ -603,9 +632,10 @@ export default function Index() {
           <p className="text-xs text-muted-foreground mt-0.5">{t.subtitle}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-        {/* زر تسجيل الدخول والبروفايل */}
-  <AuthModal />
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          {/* زر تسجيل الدخول والبروفايل */}
+          <AuthModal />
+
           {/* زر مشروع جديد */}
           <Button
             variant="outline"
@@ -616,7 +646,7 @@ export default function Index() {
             {t.newProject}
           </Button>
 
-          {/* 📖 نافذة القاموس الموحد */}
+          {/* نافذة القاموس */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 dark:text-orange-400">
@@ -635,12 +665,7 @@ export default function Index() {
                       <span className="font-bold text-foreground">{g.original}</span>
                       <span className="text-orange-500 font-bold">←</span>
                       <span className="font-bold text-foreground">{g.translation}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteGlossaryItem(g.id)}
-                        className="h-6 w-6 text-red-500"
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteGlossaryItem(g.id)} className="h-6 w-6 text-red-500">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -651,18 +676,8 @@ export default function Index() {
                 </div>
 
                 <div className="border-t border-border pt-3 space-y-2">
-                  <Input
-                    placeholder={t.origTerm}
-                    value={newGlossaryOrig}
-                    onChange={(e) => setNewGlossaryOrig(e.target.value)}
-                    className="h-8 text-xs"
-                  />
-                  <Input
-                    placeholder={t.transTerm}
-                    value={newGlossaryTrans}
-                    onChange={(e) => setNewGlossaryTrans(e.target.value)}
-                    className="h-8 text-xs"
-                  />
+                  <Input placeholder={t.origTerm} value={newGlossaryOrig} onChange={(e) => setNewGlossaryOrig(e.target.value)} className="h-8 text-xs" />
+                  <Input placeholder={t.transTerm} value={newGlossaryTrans} onChange={(e) => setNewGlossaryTrans(e.target.value)} className="h-8 text-xs" />
                   <Button onClick={handleAddGlossaryItem} className="w-full h-8 text-xs font-bold bg-orange-600 text-white">
                     <Plus className="w-3.5 h-3.5 ml-1" /> {t.addGlossary}
                   </Button>
@@ -734,6 +749,47 @@ export default function Index() {
             </DialogContent>
           </Dialog>
 
+          {/* نافذة كيفية الاستخدام (Tutorial) */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" className="h-9 gap-1 text-xs font-bold px-2 rounded-xl text-muted-foreground hover:text-orange-500">
+                <HelpCircle className="w-4 h-4" />
+                {t.howToUse}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg rounded-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold text-orange-600">كيف يعمل الموقع؟</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+                <p>هذه الأداة مصممة لمساعدة المترجمين في استخراج وترجمة نصوص المانجا والويب تون بدقة وسرعة باستخدام الذكاء الاصطناعي (Gemini).</p>
+                <ul className="list-disc list-inside space-y-2">
+                  <li><strong>الخطوة 1:</strong> احصل على مفتاح Gemini API (مجاني) وضعه في الخانة المخصصة بالأعلى.</li>
+                  <li><strong>الخطوة 2:</strong> ارفع صور الفصول أو الفصل كاملاً (كحد أقصى 10 صور في الدفعة أو ملف ZIP).</li>
+                  <li><strong>الخطوة 3 (اختياري):</strong> قم برفع ملف `txt` لترجمة فصل سابق كمرجع ليتعلم منه الذكاء الاصطناعي أسلوبك وأسماء الشخصيات.</li>
+                  <li><strong>الخطوة 4:</strong> اضغط على "تحليل" وانتظر قليلاً. سيقوم الموقع بتفريغ النصوص (OCR)، تحديد نوعها (حوار، صراخ، إلخ)، وترجمتها.</li>
+                  <li><strong>الخطوة 5:</strong> راجع النصوص، عدلها إذا لزم الأمر، ثم قم بتصديرها كملف نصي جاهز للتبييض واللصق!</li>
+                </ul>
+                <div className="bg-orange-500/10 p-3 rounded-lg border border-orange-500/20">
+                  <strong>نصيحة:</strong> استخدم "قاموس المصطلحات" لتثبيت ترجمة أسماء الشخصيات والمهارات حتى لا تتغير بين الفصول.
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* زر ديسكورد */}
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="h-9 w-9 rounded-xl hover:bg-[#5865F2] hover:text-white hover:border-[#5865F2] transition-colors"
+            onClick={() => window.open('https://discord.gg/nuaqTHvx', '_blank')}
+            title="انضم لسيرفر الديسكورد"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M13.545 2.907a13.227 13.227 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.19 12.19 0 0 0-3.658 0 8.258 8.258 0 0 0-.412-.833.051.051 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.041.041 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032c.001.014.01.028.021.037a13.276 13.276 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019c.308-.42.582-.863.818-1.329a.05.05 0 0 0-.01-.059.051.051 0 0 0-.018-.011 8.875 8.875 0 0 1-1.248-.595.05.05 0 0 1-.02-.066.051.051 0 0 1 .015-.019c.084-.063.168-.129.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.052.052 0 0 1 .053.007c.08.066.164.132.248.195a.051.051 0 0 1-.004.085 8.254 8.254 0 0 1-1.249.594.05.05 0 0 0-.03.03.052.052 0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.235 13.235 0 0 0 4.001-2.02.049.049 0 0 0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.034.034 0 0 0-.02-.019Zm-8.198 7.307c-.789 0-1.438-.724-1.438-1.612 0-.889.637-1.613 1.438-1.613.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612Zm5.316 0c-.788 0-1.438-.724-1.438-1.612 0-.889.637-1.613 1.438-1.613.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438 1.612Z"/>
+            </svg>
+          </Button>
+
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setIsDarkMode(!isDarkMode)}>
             {isDarkMode ? <Sun className="w-4 h-4 text-orange-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
           </Button>
@@ -743,13 +799,43 @@ export default function Index() {
             {lang === 'ar' ? 'English' : 'عربي'}
           </Button>
 
-          <Input
-            type="password"
-            placeholder={t.apiKeyPlaceholder}
-            value={apiKey}
-            onChange={(e) => handleSaveApiKey(e.target.value)}
-            className="h-9 text-xs w-full sm:w-56 dir-ltr rounded-xl"
-          />
+          {/* خانة الـ API مع شرح */}
+          <div className="flex items-center gap-1 bg-card border border-border rounded-xl pr-1 overflow-hidden focus-within:ring-1 ring-orange-500">
+            <Input
+              type="password"
+              placeholder={t.apiKeyPlaceholder}
+              value={apiKey}
+              onChange={(e) => handleSaveApiKey(e.target.value)}
+              className="h-9 text-xs w-full sm:w-48 dir-ltr border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-muted-foreground hover:text-orange-500">
+                  <Info className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-bold">كيف تحصل على مفتاح API؟</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 text-sm text-muted-foreground mt-2">
+                  <p>لكي يعمل الموقع، يحتاج إلى مفتاح للاتصال بنموذج الذكاء الاصطناعي (Gemini). هذا المفتاح مجاني وسهل الحصول عليه.</p>
+                  <ol className="list-decimal list-inside space-y-2 font-medium text-foreground">
+                    <li>اضغط على الرابط بالأسفل لفتح منصة Google AI Studio.</li>
+                    <li>قم بتسجيل الدخول بحساب جوجل الخاص بك.</li>
+                    <li>اضغط على زر <strong className="text-blue-500">Create API Key</strong>.</li>
+                    <li>انسخ المفتاح الطويل الذي يظهر لك والصقه في الخانة المخصصة بالأعلى.</li>
+                  </ol>
+                  <Button 
+                    className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white font-bold"
+                    onClick={() => window.open('https://aistudio.google.com/app/apikey', '_blank')}
+                  >
+                    الحصول على المفتاح من Google <ExternalLink className="w-4 h-4 mr-2 ml-2" />
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </header>
 
@@ -790,7 +876,7 @@ export default function Index() {
             imagePreview={activeImage?.url || null}
             fileName={activeImage?.name || null}
             config={config}
-            isAnalyzing={isAnalyzing}
+            isAnalyzing={isAnalyzing} // موجودة مسبقاً، تحجب الرفع أثناء المعالجة
             onImageSelected={handleImageSelected}
             onMultipleImagesSelected={handleMultipleImagesSelected}
             onClearImage={handleClearAllImages}
@@ -799,24 +885,60 @@ export default function Index() {
             lang={lang}
           />
 
+          {/* إضافة خيار رفع ملف الترجمة المرجعي */}
+          <div className="flex flex-col items-center justify-center mt-2">
+            <Label htmlFor="ref-upload" className="cursor-pointer flex items-center gap-2 text-xs text-muted-foreground hover:text-orange-500 transition-colors bg-muted/30 px-4 py-2 rounded-xl border border-dashed border-border/60">
+              <Paperclip className="w-4 h-4" />
+              {referenceFileName ? (
+                <span className="font-bold text-orange-500">{t.referenceUploaded} {referenceFileName}</span>
+              ) : (
+                <span>{t.uploadReference}</span>
+              )}
+            </Label>
+            <input 
+              id="ref-upload" 
+              type="file" 
+              accept=".txt" 
+              className="hidden" 
+              onChange={handleReferenceUpload} 
+              disabled={isAnalyzing}
+            />
+          </div>
+
+          {/* أزرار التحليل و شريط التحميل */}
           {images.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-3 pt-2">
-              <Button onClick={() => handleAnalyzeCurrent(false)} disabled={isAnalyzing} className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
-                <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'تحليل الصورة الحالية' : 'Analyze Current Image'}
-              </Button>
-              <Button onClick={() => handleAnalyzeCurrent(true)} disabled={isAnalyzing} variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 font-bold h-11 px-6 rounded-xl gap-2">
-                <FileText className="w-4 h-4" /> {t.extractOcrOnly}
-              </Button>
-              <Button onClick={() => handleAnalyzeAll(false)} disabled={isAnalyzing} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
-                <Play className="w-4 h-4 text-orange-400" /> {t.analyzeAll} ({images.length})
-              </Button>
+            <div className="flex flex-col items-center justify-center gap-4 pt-2 min-h-[60px]">
+              {isAnalyzing ? (
+                <div className="flex flex-col items-center gap-3 w-full max-w-md bg-card p-4 rounded-2xl border border-orange-500/30 shadow-lg animate-in fade-in zoom-in duration-300">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
+                    <span className="text-sm font-bold text-foreground">{currentProcessingMsg}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-orange-500 h-full animate-[pulse_2s_ease-in-out_infinite] w-full origin-left scale-x-100"></div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-center">يرجى الانتظار، جاري التواصل مع خوادم الذكاء الاصطناعي لاستخراج وترجمة النصوص...</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap justify-center gap-3 w-full animate-in fade-in zoom-in">
+                  <Button onClick={() => handleAnalyzeCurrent(false)} className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
+                    <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'تحليل الصورة الحالية' : 'Analyze Current Image'}
+                  </Button>
+                  <Button onClick={() => handleAnalyzeCurrent(true)} variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 font-bold h-11 px-6 rounded-xl gap-2">
+                    <FileText className="w-4 h-4" /> {t.extractOcrOnly}
+                  </Button>
+                  <Button onClick={() => handleAnalyzeAll(false)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
+                    <Play className="w-4 h-4 text-orange-400" /> {t.analyzeAll} ({images.length})
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
           {/* Action Bar */}
-          <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-2xl border border-border gap-3">
+          <div className="flex flex-wrap items-center justify-between bg-card p-4 rounded-2xl border border-border gap-3 shadow-sm">
             <Button variant="outline" onClick={() => setView('upload')} className="gap-2 text-xs font-bold rounded-xl">
               <ArrowLeft className="w-4 h-4" /> {t.backToUpload}
             </Button>
@@ -851,37 +973,36 @@ export default function Index() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl">
-                  <DropdownMenuItem onClick={() => handleExportText('current', 'original')} className="text-xs cursor-pointer">{t.exportCurrentPage}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportText('all', 'original')} className="text-xs cursor-pointer">{t.exportAllPages}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('current', 'original')} className="text-xs cursor-pointer font-medium">{t.exportCurrentPage}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('all', 'original')} className="text-xs cursor-pointer font-medium">{t.exportAllPages}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5 text-xs font-bold rounded-xl">
+                  <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5 text-xs font-bold rounded-xl shadow-sm">
                     <Download className="w-4 h-4" /> {t.exportTranslated} <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl">
-                  <DropdownMenuItem onClick={() => handleExportText('current', 'translated')} className="text-xs cursor-pointer">{t.exportCurrentPage}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportText('all', 'translated')} className="text-xs cursor-pointer">{t.exportAllPages}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('current', 'translated')} className="text-xs cursor-pointer font-medium">{t.exportCurrentPage}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportText('all', 'translated')} className="text-xs cursor-pointer font-medium">{t.exportAllPages}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Image Preview Panel with Canvas Overlay Feature */}
+            {/* Image Preview Panel */}
             <Card className="rounded-2xl overflow-hidden border-border bg-zinc-950/5 flex flex-col h-[750px]">
               <div className="p-3 border-b border-border bg-card/60 flex justify-between items-center text-xs text-muted-foreground font-semibold">
                 <span>{t.pagePreview} (#{activeImageIndex + 1})</span>
                 <div className="flex items-center gap-2">
-                  {/* 🖼️ زر تفعيل/إيقاف المعاينة البصرية النصية */}
                   <Button
                     variant={showOverlay ? "default" : "outline"}
                     size="sm"
                     onClick={() => setShowOverlay(!showOverlay)}
-                    className={`h-7 text-[11px] font-bold gap-1 rounded-lg ${showOverlay ? 'bg-orange-600 text-white' : ''}`}
+                    className={`h-7 text-[11px] font-bold gap-1 rounded-lg ${showOverlay ? 'bg-orange-600 text-white shadow-md' : ''}`}
                   >
                     {showOverlay ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                     {t.visualOverlay}
@@ -896,7 +1017,6 @@ export default function Index() {
                       alt="Manga Page"
                       className="w-full h-auto object-contain rounded-lg shadow-md"
                     />
-                    {/* طبقة المعاينة البصرية للنصوص المترجمة (Canvas Overlay) */}
                     {showOverlay && currentItems.map((item, idx) => (
                       <div
                         key={item.id}
@@ -905,8 +1025,8 @@ export default function Index() {
                         style={{ top: `${item.topPercent ?? ((idx + 1) * 15)}%` }}
                         className={`absolute left-1/2 -translate-x-1/2 w-[85%] bg-black/80 backdrop-blur-md text-white border text-center p-2 rounded-xl text-xs font-bold transition-all shadow-xl cursor-pointer ${
                           hoveredItemId === item.id
-                            ? 'border-orange-500 scale-105 bg-orange-950/90 text-orange-200 ring-2 ring-orange-500'
-                            : 'border-orange-500/40 hover:border-orange-400'
+                            ? 'border-orange-500 scale-105 bg-orange-950/90 text-orange-200 ring-2 ring-orange-500 z-10'
+                            : 'border-orange-500/40 hover:border-orange-400 z-0'
                         }`}
                       >
                         <span className="text-[10px] text-orange-400 block mb-0.5">#{idx + 1} ({item.category})</span>
@@ -921,7 +1041,7 @@ export default function Index() {
             </Card>
 
             {/* Extracted Texts List */}
-            <div className="space-y-4 h-[750px] overflow-y-auto pl-2">
+            <div className="space-y-4 h-[750px] overflow-y-auto pl-2 pr-1 custom-scrollbar">
               <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/50">
                 <h3 className="font-bold text-base text-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-orange-500" />
@@ -931,7 +1051,7 @@ export default function Index() {
                   variant="outline"
                   size="sm"
                   onClick={handleCopyPageFormatted}
-                  className="h-8 text-xs font-bold gap-1.5 rounded-lg border-orange-500/30 text-orange-600 dark:text-orange-400"
+                  className="h-8 text-xs font-bold gap-1.5 rounded-lg border-orange-500/30 text-orange-600 dark:text-orange-400 shadow-sm"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   {t.copyAllPage}
@@ -943,13 +1063,13 @@ export default function Index() {
                   key={item.id}
                   onMouseEnter={() => setHoveredItemId(item.id)}
                   onMouseLeave={() => setHoveredItemId(null)}
-                  className={`p-4 space-y-3 border-border rounded-xl shadow-sm transition-all ${
+                  className={`p-4 space-y-3 border-border rounded-xl shadow-sm transition-all duration-200 ${
                     hoveredItemId === item.id
                       ? 'border-orange-500 ring-1 ring-orange-500/40 bg-orange-500/5'
                       : 'hover:border-orange-500/30'
                   }`}
                 >
-                  <div className="flex justify-between items-center text-xs text-muted-foreground font-semibold">
+                  <div className="flex flex-wrap justify-between items-center text-xs text-muted-foreground font-semibold gap-2">
                     <div className="flex items-center gap-2">
                       <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-md font-bold">
                         {t.paragraph} #{idx + 1}
@@ -976,12 +1096,12 @@ export default function Index() {
                       </Button>
 
                       <Select value={item.category} onValueChange={(val) => updateItem(item.id, 'category', val)}>
-                        <SelectTrigger className="w-[170px] h-8 text-xs font-bold">
+                        <SelectTrigger className="w-[150px] h-8 text-xs font-bold rounded-lg bg-background">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl">
                           {tags.map((tag) => (
-                            <SelectItem key={tag.value} value={tag.value}>
+                            <SelectItem key={tag.value} value={tag.value} className="text-xs font-medium">
                               {tag.label}
                             </SelectItem>
                           ))}
@@ -995,7 +1115,7 @@ export default function Index() {
                     <Textarea
                       value={item.originalText}
                       onChange={(e) => updateItem(item.id, 'originalText', e.target.value)}
-                      className="min-h-[50px] text-sm dir-ltr bg-muted/20 rounded-lg"
+                      className="min-h-[50px] text-sm dir-ltr bg-muted/30 border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-orange-500/50"
                     />
                   </div>
 
@@ -1006,7 +1126,7 @@ export default function Index() {
                     <Textarea
                       value={item.translatedText}
                       onChange={(e) => updateItem(item.id, 'translatedText', e.target.value)}
-                      className="min-h-[50px] text-sm font-medium bg-card rounded-lg"
+                      className="min-h-[50px] text-sm font-medium bg-card rounded-lg focus-visible:ring-1 focus-visible:ring-orange-500"
                     />
                   </div>
                 </Card>

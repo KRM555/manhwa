@@ -780,14 +780,23 @@ export default function Index() {
             {lang === 'ar' ? 'English' : 'عربي'}
           </Button>
 
-          <Input
-            type="password"
-            placeholder={t.apiKeyPlaceholder}
-            value={apiKey}
-            onChange={(e) => handleSaveApiKey(e.target.value)}
-            className="h-9 text-xs w-full sm:w-56 dir-ltr rounded-xl"
-          />
-        </div>
+          <div className="flex items-center gap-2">
+  <Input
+    type="password"
+    placeholder={t.apiKeyPlaceholder}
+    value={apiKey}
+    onChange={(e) => handleSaveApiKey(e.target.value)}
+    className="h-9 text-xs w-full sm:w-56 dir-ltr rounded-xl"
+  />
+  <a
+    href={t.getKeyUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-xs text-orange-400 hover:text-orange-300 transition-colors whitespace-nowrap underline"
+  >
+    {t.getKeyLabel}
+  </a>
+</div>
       </header>
 
       {/* Bar for images */}

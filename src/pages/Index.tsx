@@ -129,15 +129,15 @@ const UI_TEXT = {
     discordTooltip: 'الدعم والشكاوى عبر Discord',
   },
   en: {
-    subtitle: 'Webtoon and Manhwa script extraction, translation, and formatting tool',
+    subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
     apiLabel: 'Gemini API Key:',
     apiKeyPlaceholder: 'AIzaSy...',
     backToUpload: 'Back to Upload',
     reAnalyze: 'Re-analyze',
     analyzeAll: 'Analyze All Images',
     extractOcrOnly: 'Extract Text Only (OCR)',
-    exportOriginal: 'Export Original Text (OCR)',
-    exportTranslated: 'Export Translated Text',
+    exportOriginal: 'Export Original (OCR)',
+    exportTranslated: 'Export Translated',
     exportCurrentPage: 'Current Page Only',
     exportAllPages: 'All Pages',
     pagePreview: 'Page Preview',
@@ -182,7 +182,7 @@ const UI_TEXT = {
     guideStep3: 'Click "Analyze & Extract Texts" to open the interactive editor.',
     discordTooltip: 'Support & Complaints via Discord',
   },
-};
+
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
     apiLabel: 'Gemini API Key:',

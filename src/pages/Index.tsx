@@ -497,7 +497,7 @@ export default function Index() {
     return null;
   };
 
-  const handleAnalyzeCurrent = async (ocrOnly = false) => {
+ const handleAnalyzeCurrent = async (ocrOnly = false) => {
     if (!activeImage) return toast.error(t.selectImageFirst);
     if (!apiKey.trim()) return toast.error(t.enterApiKey);
 
@@ -509,17 +509,23 @@ export default function Index() {
       setResultsMap((prev) => ({ ...prev, [activeImage.id]: res }));
       toast.success(t.successExtract);
       setView('results');
-      if (activeImage) {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        supabase.from('user_history').insert({
+
+      // حفظ العملية في السجل وطباعة الخطأ لو حدث
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && activeImage) {
+        const { error } = await supabase.from('user_history').insert({
           user_id: session.user.id,
           image_name: activeImage.name,
           extracted_count: res.length,
         });
+
+        if (error) {
+          console.error('خطأ Supabase أثناء الحفظ:', error.message);
+          toast.error('تعذر حفظ السجل: ' + error.message);
+        } else {
+          console.log('تم الحفظ في السجل بنجاح!');
+        }
       }
-    });
-  }
     } else {
       toast.error(lang === 'ar' ? 'حدث خطأ أثناء معالجة الصورة' : 'Failed to process image');
     }

@@ -395,7 +395,7 @@ export default function Index() {
         if (updatedTranslated.includes(findText)) {
           const count = updatedTranslated.split(findText).length - 1;
           totalReplacements += count;
-          updatedTranslated = updatedTranslated.replaceAll(findText, replaceText);
+          updatedTranslated = updatedTranslated.split(findText).join(replaceText);
         }
         return { ...item, translatedText: updatedTranslated };
       });

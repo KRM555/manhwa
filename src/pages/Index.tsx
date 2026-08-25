@@ -673,14 +673,14 @@ export default function Index() {
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     placeholder={t.origTerm}
-                    value={newOrigTerm}
-                    onChange={(e) => setNewOrigTerm(e.target.value)}
+                    value={newGlossaryOrig}
+                    onChange={(e) => setNewGlossaryOrig(e.target.value)}
                     className="text-xs"
                   />
                   <Input
                     placeholder={t.transTerm}
-                    value={newTransTerm}
-                    onChange={(e) => setNewTransTerm(e.target.value)}
+                    value={newGlossaryTrans}
+                    onChange={(e) => setNewGlossaryTrans(e.target.value)}
                     className="text-xs"
                   />
                 </div>
@@ -696,8 +696,8 @@ export default function Index() {
                       <div key={idx} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded">
                         <span className="font-semibold text-orange-600">{item.original}</span>
                         <span className="text-muted-foreground">←</span>
-                        <span>{item.translated}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveGlossaryItem(idx)}>
+                        <span>{item.translation}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteGlossaryItem(item.id || String(idx))}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -712,14 +712,14 @@ export default function Index() {
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 hover:bg-orange-500/10">
-                <SlidersHorizontal className="w-4 h-4 text-orange-500" />
+                <RotateCcw className="w-4 h-4 text-orange-500" />
                 {t.tagSettings}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] dir-rtl">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-lg">
-                  <SlidersHorizontal className="w-5 h-5 text-orange-500" />
+                  <RotateCcw className="w-5 h-5 text-orange-500" />
                   {t.tagSettings}
                 </DialogTitle>
               </DialogHeader>
@@ -729,8 +729,8 @@ export default function Index() {
                   <div className="grid grid-cols-3 gap-2">
                     <Input
                       placeholder={t.tagName}
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
+                      value={newTagLabel}
+                      onChange={(e) => setNewTagLabel(e.target.value)}
                       className="text-xs"
                     />
                     <Input
@@ -755,23 +755,21 @@ export default function Index() {
                 <div className="border-t pt-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold">العلامات الحالية</span>
-                    <Button variant="ghost" className="h-7 text-xs text-orange-500" onClick={handleResetTags}>
+                    <Button variant="ghost" className="h-7 text-xs text-orange-500" onClick={() => setTags([])}>
                       <RotateCcw className="w-3.5 h-3.5 ml-1" />
                       {t.resetDefaultTags}
                     </Button>
                   </div>
                   <div className="max-h-52 overflow-y-auto space-y-1.5 border rounded-lg p-2">
-                    {customTags.map((tag) => (
-                      <div key={tag.id} className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded">
-                        <span className="font-medium">{tag.name}</span>
+                    {tags.map((tagItem, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded">
+                        <span className="font-medium">{tagItem.label}</span>
                         <code className="text-[10px] bg-background px-1.5 py-0.5 rounded dir-ltr border">
-                          {tag.prefix}النص{tag.suffix}
+                          {tagItem.prefix}النص{tagItem.suffix}
                         </code>
-                        {tag.isCustom && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteTag(tag.id)}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteTag(tagItem.label)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                     ))}
                   </div>

@@ -78,8 +78,6 @@ const UI_TEXT = {
     subtitle: 'أداة استخراج وترجمة وتنسيق سكريبتات الويب تون والمانجا',
     apiLabel: 'مفتاح Gemini API:',
     apiKeyPlaceholder: 'AIzaSy...',
-    getKeyLabel: 'احصل على المفتاح 🔗',
-    getKeyUrl: 'https://aistudio.google.com/app/apikey',
     backToUpload: 'العودة للرفع',
     reAnalyze: 'إعادة التحليل',
     analyzeAll: 'تحليل كافة الصور',
@@ -124,18 +122,11 @@ const UI_TEXT = {
     transTerm: 'الترجمة المعتمدة',
     addGlossary: 'إضافة للقاموس',
     visualOverlay: 'المعاينة البصرية النصية',
-    guideTitle: '📖 كيف تستخدم الأدوات؟',
-    guideStep1: 'اسحب وأسقط صور المانجا أو ارفع ملف ZIP.',
-    guideStep2: 'حدد خيارات الاستخراج واللغة المستهدفة.',
-    guideStep3: 'اضغط تحليل واستخراج النصوص للانتقال للمحرر التفاعلي.',
-    discordTooltip: 'الدعم والشكاوى عبر Discord',
   },
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
     apiLabel: 'Gemini API Key:',
     apiKeyPlaceholder: 'AIzaSy...',
-    getKeyLabel: 'Get API Key 🔗',
-    getKeyUrl: 'https://aistudio.google.com/app/apikey',
     backToUpload: 'Back to Upload',
     reAnalyze: 'Re-analyze',
     analyzeAll: 'Analyze All Images',
@@ -180,11 +171,6 @@ const UI_TEXT = {
     transTerm: 'Approved Translation',
     addGlossary: 'Add to Glossary',
     visualOverlay: 'Visual Text Overlay',
-    guideTitle: '📖 How to use the tool?',
-    guideStep1: 'Drag and drop manhwa images or upload a ZIP file.',
-    guideStep2: 'Select extraction options and target language.',
-    guideStep3: 'Click "Analyze & Extract Texts" to open the interactive editor.',
-    discordTooltip: 'Support & Complaints via Discord',
   },
 };
 
@@ -409,7 +395,7 @@ export default function Index() {
         if (updatedTranslated.includes(findText)) {
           const count = updatedTranslated.split(findText).length - 1;
           totalReplacements += count;
-          updatedTranslated = updatedTranslated.split(findText).join(replaceText);
+          updatedTranslated = updatedTranslated.replaceAll(findText, replaceText);
         }
         return { ...item, translatedText: updatedTranslated };
       });
@@ -511,7 +497,7 @@ export default function Index() {
     return null;
   };
 
- const handleAnalyzeCurrent = async (ocrOnly = false) => {
+  const handleAnalyzeCurrent = async (ocrOnly = false) => {
     if (!activeImage) return toast.error(t.selectImageFirst);
     if (!apiKey.trim()) return toast.error(t.enterApiKey);
 
@@ -523,23 +509,17 @@ export default function Index() {
       setResultsMap((prev) => ({ ...prev, [activeImage.id]: res }));
       toast.success(t.successExtract);
       setView('results');
-
-      // حفظ العملية في السجل وطباعة الخطأ لو حدث
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user && activeImage) {
-        const { error } = await supabase.from('user_history').insert({
+      if (activeImage) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        supabase.from('user_history').insert({
           user_id: session.user.id,
           image_name: activeImage.name,
           extracted_count: res.length,
         });
-
-        if (error) {
-          console.error('خطأ Supabase أثناء الحفظ:', error.message);
-          toast.error('تعذر حفظ السجل: ' + error.message);
-        } else {
-          console.log('تم الحفظ في السجل بنجاح!');
-        }
       }
+    });
+  }
     } else {
       toast.error(lang === 'ar' ? 'حدث خطأ أثناء معالجة الصورة' : 'Failed to process image');
     }
@@ -553,32 +533,15 @@ export default function Index() {
     setIsAnalyzing(true);
     toast.info(lang === 'ar' ? `جاري تحليل كل الصور (${images.length})...` : `Analyzing all ${images.length} images...`);
 
-    const { data: { session } } = await supabase.auth.getSession();
     const newMap = { ...resultsMap };
-
     for (const img of images) {
       const res = await processGeminiRequest(img, ocrOnly);
-      if (res) {
-        newMap[img.id] = res;
-
-        // حفظ كل صورة تترجم بنجاح في سجل Supabase
-        if (session?.user) {
-          const { error } = await supabase.from('user_history').insert({
-            user_id: session.user.id,
-            image_name: img.name,
-            extracted_count: res.length,
-          });
-
-          if (error) {
-            console.error(`فشل حفظ الصورة ${img.name}:`, error.message);
-          }
-        }
-      }
+      if (res) newMap[img.id] = res;
     }
 
     setResultsMap(newMap);
     setIsAnalyzing(false);
-    toast.success(lang === 'ar' ? 'أتمت معالجة كافة الصور بنجاح!' : 'All images processed successfully!');
+    toast.success(lang === 'ar' ? 'تمت معالجة كافة الصور بنجاح!' : 'All images processed successfully!');
     setView('results');
   };
 
@@ -641,161 +604,152 @@ export default function Index() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          {/* زر تسجيل الدخول والبروفايل */}
-          <AuthModal />
-
+        {/* زر تسجيل الدخول والبروفايل */}
+  <AuthModal />
           {/* زر مشروع جديد */}
           <Button
             variant="outline"
             onClick={handleClearAllImages}
-            className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+            className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
           >
             <FolderPlus className="w-4 h-4 text-orange-500" />
             {t.newProject}
           </Button>
 
-          {/* نافذة القاموس الموحد */}
+          {/* 📖 نافذة القاموس الموحد */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 hover:bg-orange-500/10">
+              <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 dark:text-orange-400">
                 <BookOpen className="w-4 h-4 text-orange-500" />
                 {t.glossaryTitle} ({glossary.length})
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px] dir-rtl">
+            <DialogContent className="max-w-md rounded-2xl">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-lg">
-                  <BookOpen className="w-5 h-5 text-orange-500" />
-                  {t.glossaryTitle}
-                </DialogTitle>
+                <DialogTitle className="text-base font-bold">{t.glossaryTitle}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-3">
-                <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-4 py-2">
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {glossary.map((g) => (
+                    <div key={g.id} className="flex items-center justify-between bg-muted/40 p-2 rounded-lg text-xs">
+                      <span className="font-bold text-foreground">{g.original}</span>
+                      <span className="text-orange-500 font-bold">←</span>
+                      <span className="font-bold text-foreground">{g.translation}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteGlossaryItem(g.id)}
+                        className="h-6 w-6 text-red-500"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  {glossary.length === 0 && (
+                    <p className="text-xs text-center text-muted-foreground py-4">لا توجد مصطلحات أو أسماء محفوظة بعد</p>
+                  )}
+                </div>
+
+                <div className="border-t border-border pt-3 space-y-2">
                   <Input
                     placeholder={t.origTerm}
                     value={newGlossaryOrig}
                     onChange={(e) => setNewGlossaryOrig(e.target.value)}
-                    className="text-xs"
+                    className="h-8 text-xs"
                   />
                   <Input
                     placeholder={t.transTerm}
                     value={newGlossaryTrans}
                     onChange={(e) => setNewGlossaryTrans(e.target.value)}
-                    className="text-xs"
+                    className="h-8 text-xs"
                   />
-                </div>
-                <Button onClick={handleAddGlossaryItem} className="w-full h-8 text-xs bg-orange-500 hover:bg-orange-600">
-                  <Plus className="w-4 h-4 ml-1" />
-                  {t.addGlossary}
-                </Button>
-                <div className="max-h-60 overflow-y-auto space-y-2 border rounded-lg p-2">
-                  {glossary.length === 0 ? (
-                    <p className="text-xs text-center text-muted-foreground py-4">لا توجد مصطلحات مضافة بعد</p>
-                  ) : (
-                    glossary.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded">
-                        <span className="font-semibold text-orange-600">{item.original}</span>
-                        <span className="text-muted-foreground">←</span>
-                        <span>{item.translation}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteGlossaryItem(item.id || String(idx))}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
+                  <Button onClick={handleAddGlossaryItem} className="w-full h-8 text-xs font-bold bg-orange-600 text-white">
+                    <Plus className="w-3.5 h-3.5 ml-1" /> {t.addGlossary}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
 
-          {/* نافذة إعدادات العلامات (Tag Settings) */}
+          {/* إعدادات العلامات */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 hover:bg-orange-500/10">
-                <RotateCcw className="w-4 h-4 text-orange-500" />
+              <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl">
+                <Settings2 className="w-4 h-4 text-orange-500" />
                 {t.tagSettings}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] dir-rtl">
+            <DialogContent className="max-w-md rounded-2xl">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-lg">
-                  <RotateCcw className="w-5 h-5 text-orange-500" />
-                  {t.tagSettings}
+                <DialogTitle className="text-base font-bold flex items-center justify-between">
+                  <span>{t.tagSettings}</span>
+                  <Button variant="ghost" size="sm" onClick={() => setTags(DEFAULT_TAGS)} className="text-xs text-muted-foreground hover:text-orange-500 gap-1">
+                    <RotateCcw className="w-3.5 h-3.5" /> {t.resetDefaultTags}
+                  </Button>
                 </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-3">
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold">{t.addNewTag}</h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Input
-                      placeholder={t.tagName}
-                      value={newTagLabel}
-                      onChange={(e) => setNewTagLabel(e.target.value)}
-                      className="text-xs"
-                    />
-                    <Input
-                      placeholder={t.tagPrefix}
-                      value={newTagPrefix}
-                      onChange={(e) => setNewTagPrefix(e.target.value)}
-                      className="text-xs dir-ltr"
-                    />
-                    <Input
-                      placeholder={t.tagSuffix}
-                      value={newTagSuffix}
-                      onChange={(e) => setNewTagSuffix(e.target.value)}
-                      className="text-xs dir-ltr"
-                    />
-                  </div>
-                  <Button onClick={handleAddCustomTag} className="w-full h-8 text-xs bg-orange-500 hover:bg-orange-600">
-                    <Plus className="w-4 h-4 ml-1" />
-                    {t.add}
-                  </Button>
+              <div className="space-y-4 py-2">
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {tags.map((tag, i) => (
+                    <div key={tag.value || i} className="flex items-center gap-1.5 bg-muted/40 p-2 rounded-lg text-xs">
+                      <span className="font-bold w-24 truncate">{tag.label}</span>
+                      <Input
+                        value={tag.prefix}
+                        onChange={(e) => {
+                          const updated = [...tags];
+                          updated[i].prefix = e.target.value;
+                          setTags(updated);
+                        }}
+                        className="h-7 text-xs w-16"
+                        placeholder="Prefix"
+                      />
+                      <Input
+                        value={tag.suffix}
+                        onChange={(e) => {
+                          const updated = [...tags];
+                          updated[i].suffix = e.target.value;
+                          setTags(updated);
+                        }}
+                        className="h-7 text-xs w-16"
+                        placeholder="Suffix"
+                      />
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(i)} className="h-7 w-7 text-red-500">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="border-t pt-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold">العلامات الحالية</span>
-                    <Button variant="ghost" className="h-7 text-xs text-orange-500" onClick={() => setTags([])}>
-                      <RotateCcw className="w-3.5 h-3.5 ml-1" />
-                      {t.resetDefaultTags}
-                    </Button>
+                <div className="border-t border-border pt-3 space-y-2">
+                  <Input placeholder={t.tagName} value={newTagLabel} onChange={(e) => setNewTagLabel(e.target.value)} className="h-8 text-xs" />
+                  <div className="flex gap-2">
+                    <Input placeholder={t.tagPrefix} value={newTagPrefix} onChange={(e) => setNewTagPrefix(e.target.value)} className="h-8 text-xs" />
+                    <Input placeholder={t.tagSuffix} value={newTagSuffix} onChange={(e) => setNewTagSuffix(e.target.value)} className="h-8 text-xs" />
                   </div>
-                  <div className="max-h-52 overflow-y-auto space-y-1.5 border rounded-lg p-2">
-                    {tags.map((tagItem, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded">
-                        <span className="font-medium">{tagItem.label}</span>
-                        <code className="text-[10px] bg-background px-1.5 py-0.5 rounded dir-ltr border">
-                          {tagItem.prefix}النص{tagItem.suffix}
-                        </code>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteTag(idx)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                  <Button onClick={handleAddCustomTag} className="w-full h-8 text-xs font-bold bg-orange-600 text-white">
+                    <Plus className="w-3.5 h-3.5 ml-1" /> {t.add}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
 
-          {/* رابط وخانة إدخال المفتاح */}
-          <div className="flex items-center gap-2">
-            <Input
-              type="password"
-              placeholder={t.apiKeyPlaceholder}
-              value={apiKey}
-              onChange={(e) => handleSaveApiKey(e.target.value)}
-              className="h-9 text-xs w-full sm:w-56 dir-ltr rounded-xl"
-            />
-            <a
-              href={t.getKeyUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-orange-400 hover:text-orange-300 transition-colors whitespace-nowrap underline"
-            >
-              {t.getKeyLabel}
-            </a>
-          </div>
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setIsDarkMode(!isDarkMode)}>
+            {isDarkMode ? <Sun className="w-4 h-4 text-orange-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+          </Button>
+
+          <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}>
+            <Languages className="w-4 h-4 text-orange-500" />
+            {lang === 'ar' ? 'English' : 'عربي'}
+          </Button>
+
+          <Input
+            type="password"
+            placeholder={t.apiKeyPlaceholder}
+            value={apiKey}
+            onChange={(e) => handleSaveApiKey(e.target.value)}
+            className="h-9 text-xs w-full sm:w-56 dir-ltr rounded-xl"
+          />
         </div>
       </header>
 
@@ -844,32 +798,6 @@ export default function Index() {
             onAnalyze={() => handleAnalyzeCurrent(false)}
             lang={lang}
           />
-          {/* 👈 ضع كود البطاقة هنا تماماً */}
-      <div className="max-w-xl mx-auto my-4 p-4 border border-border/60 shadow-sm rounded-2xl bg-card/60 space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-border/50">
-          <h3 className="text-xs font-bold text-orange-500 flex items-center gap-1.5">
-            {t.guideTitle}
-          </h3>
-          
-          <a
-            href="https://discord.gg/nuaqTHvx"
-            target="_blank"
-            rel="noopener noreferrer"
-            title={t.discordTooltip}
-            className="p-1.5 rounded-xl bg-[#5865F2]/10 text-[#5865F2] hover:bg-[#5865F2] hover:text-white transition-all duration-200"
-          >
-            <svg className="w-5 h-5 fill-current" viewBox="0 0 127.14 96.36">
-              <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.68 1.76 1.36 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15z" />
-            </svg>
-          </a>
-        </div>
-
-        <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
-          <li>{t.guideStep1}</li>
-          <li>{t.guideStep2}</li>
-          <li>{t.guideStep3}</li>
-        </ol>
-      </div>
 
           {images.length > 0 && (
             <div className="flex flex-wrap justify-center gap-3 pt-2">

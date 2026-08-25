@@ -640,7 +640,75 @@ export default function Index() {
           <p className="text-xs text-muted-foreground mt-0.5">{t.subtitle}</p>
         </div>
 
-        {/* نافذة إعدادات العلامات (Tag Settings) */}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* زر تسجيل الدخول والبروفايل */}
+          <AuthModal />
+
+          {/* زر مشروع جديد */}
+          <Button
+            variant="outline"
+            onClick={handleClearAllImages}
+            className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+          >
+            <FolderPlus className="w-4 h-4 text-orange-500" />
+            {t.newProject}
+          </Button>
+
+          {/* نافذة القاموس الموحد */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 hover:bg-orange-500/10">
+                <BookOpen className="w-4 h-4 text-orange-500" />
+                {t.glossaryTitle} ({glossary.length})
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px] dir-rtl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <BookOpen className="w-5 h-5 text-orange-500" />
+                  {t.glossaryTitle}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder={t.origTerm}
+                    value={newGlossaryOrig}
+                    onChange={(e) => setNewGlossaryOrig(e.target.value)}
+                    className="text-xs"
+                  />
+                  <Input
+                    placeholder={t.transTerm}
+                    value={newGlossaryTrans}
+                    onChange={(e) => setNewGlossaryTrans(e.target.value)}
+                    className="text-xs"
+                  />
+                </div>
+                <Button onClick={handleAddGlossaryItem} className="w-full h-8 text-xs bg-orange-500 hover:bg-orange-600">
+                  <Plus className="w-4 h-4 ml-1" />
+                  {t.addGlossary}
+                </Button>
+                <div className="max-h-60 overflow-y-auto space-y-2 border rounded-lg p-2">
+                  {glossary.length === 0 ? (
+                    <p className="text-xs text-center text-muted-foreground py-4">لا توجد مصطلحات مضافة بعد</p>
+                  ) : (
+                    glossary.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded">
+                        <span className="font-semibold text-orange-600">{item.original}</span>
+                        <span className="text-muted-foreground">←</span>
+                        <span>{item.translation}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteGlossaryItem(item.id || String(idx))}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* نافذة إعدادات العلامات (Tag Settings) */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 hover:bg-orange-500/10">
@@ -709,6 +777,27 @@ export default function Index() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* رابط وخانة إدخال المفتاح */}
+          <div className="flex items-center gap-2">
+            <Input
+              type="password"
+              placeholder={t.apiKeyPlaceholder}
+              value={apiKey}
+              onChange={(e) => handleSaveApiKey(e.target.value)}
+              className="h-9 text-xs w-full sm:w-56 dir-ltr rounded-xl"
+            />
+            <a
+              href={t.getKeyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-orange-400 hover:text-orange-300 transition-colors whitespace-nowrap underline"
+            >
+              {t.getKeyLabel}
+            </a>
+          </div>
+        </div>
+      </header>
 
       {/* Bar for images */}
       {images.length > 0 && (

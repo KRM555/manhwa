@@ -122,7 +122,67 @@ const UI_TEXT = {
     transTerm: 'الترجمة المعتمدة',
     addGlossary: 'إضافة للقاموس',
     visualOverlay: 'المعاينة البصرية النصية',
+    guideTitle: '📖 كيف تستخدم الأدوات؟',
+    guideStep1: 'اسحب وأسقط صور المانجا أو ارفع ملف ZIP.',
+    guideStep2: 'حدد خيارات الاستخراج واللغة المستهدفة.',
+    guideStep3: 'اضغط تحليل واستخراج النصوص للانتقال للمحرر التفاعلي.',
+    discordTooltip: 'الدعم والشكاوى عبر Discord',
   },
+  en: {
+    subtitle: 'Webtoon and Manhwa script extraction, translation, and formatting tool',
+    apiLabel: 'Gemini API Key:',
+    apiKeyPlaceholder: 'AIzaSy...',
+    backToUpload: 'Back to Upload',
+    reAnalyze: 'Re-analyze',
+    analyzeAll: 'Analyze All Images',
+    extractOcrOnly: 'Extract Text Only (OCR)',
+    exportOriginal: 'Export Original Text (OCR)',
+    exportTranslated: 'Export Translated Text',
+    exportCurrentPage: 'Current Page Only',
+    exportAllPages: 'All Pages',
+    pagePreview: 'Page Preview',
+    extractedTexts: 'Extracted Texts',
+    originalText: 'Original Text:',
+    translatedText: 'Translated / Output Text:',
+    noImage: 'No image selected',
+    page: 'Page',
+    multiImageLimit: 'Maximum limit is 10 images',
+    paragraph: 'Paragraph',
+    selectImageFirst: 'Please select at least one image',
+    enterApiKey: 'Please enter Gemini API Key first',
+    analyzing: 'Processing and extracting text with Gemini...',
+    successExtract: 'Texts extracted successfully!',
+    noItemsToExport: 'No texts to export for this page',
+    clearAll: 'Clear All',
+    tagSettings: 'Tag Settings',
+    addNewTag: 'Add New Tag',
+    tagName: 'Tag Name',
+    tagPrefix: 'Prefix',
+    tagSuffix: 'Suffix',
+    add: 'Add',
+    deleteTag: 'Delete Tag',
+    resetDefaultTags: 'Reset Default Tags',
+    newProject: 'New Project',
+    copyBlock: 'Copy Block',
+    copyAllPage: 'Copy Page Texts',
+    copied: 'Copied!',
+    findReplace: 'Find & Replace',
+    findPlaceholder: 'Find word...',
+    replacePlaceholder: 'Replace with...',
+    replaceCurrentPage: 'In this page',
+    replaceAllPages: 'In all pages',
+    glossaryTitle: 'Glossary & Terms',
+    origTerm: 'Original Term',
+    transTerm: 'Approved Translation',
+    addGlossary: 'Add to Glossary',
+    visualOverlay: 'Visual Overlay Preview',
+    guideTitle: '📖 How to use the tool?',
+    guideStep1: 'Drag and drop manhwa images or upload a ZIP file.',
+    guideStep2: 'Select extraction options and target language.',
+    guideStep3: 'Click "Analyze & Extract Texts" to open the interactive editor.',
+    discordTooltip: 'Support & Complaints via Discord',
+  },
+};
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
     apiLabel: 'Gemini API Key:',
@@ -821,6 +881,32 @@ export default function Index() {
             onAnalyze={() => handleAnalyzeCurrent(false)}
             lang={lang}
           />
+          {/* 👈 ضع كود البطاقة هنا تماماً */}
+      <div className="max-w-xl mx-auto my-4 p-4 border border-border/60 shadow-sm rounded-2xl bg-card/60 space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-border/50">
+          <h3 className="text-xs font-bold text-orange-500 flex items-center gap-1.5">
+            {t.guideTitle}
+          </h3>
+          
+          <a
+            href="https://discord.gg/nuaqTHvx"
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t.discordTooltip}
+            className="p-1.5 rounded-xl bg-[#5865F2]/10 text-[#5865F2] hover:bg-[#5865F2] hover:text-white transition-all duration-200"
+          >
+            <svg className="w-5 h-5 fill-current" viewBox="0 0 127.14 96.36">
+              <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.68 1.76 1.36 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15z" />
+            </svg>
+          </a>
+        </div>
+
+        <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
+          <li>{t.guideStep1}</li>
+          <li>{t.guideStep2}</li>
+          <li>{t.guideStep3}</li>
+        </ol>
+      </div>
 
           {images.length > 0 && (
             <div className="flex flex-wrap justify-center gap-3 pt-2">

@@ -14,10 +14,6 @@ interface TyperItemCardProps {
 }
 
 export const TyperItemCard: React.FC<TyperItemCardProps> = ({ item, onChange }) => {
-  // Determine Text Direction (RTL for Arabic, LTR for English/Other)
-  const isArabic = /[\u0600-\u06FF]/.test(item.translatedText);
-  const textDirection = isArabic ? 'rtl' : 'ltr';
-
   const categories = [
     { value: 'dialogue', label: 'حوار ""' },
     { value: 'thought', label: 'أفكار ()' },
@@ -28,7 +24,6 @@ export const TyperItemCard: React.FC<TyperItemCardProps> = ({ item, onChange }) 
   ];
 
   const handleCategoryChange = (newCategory: string) => {
-    // Strip existing prefixes
     let cleanText = item.translatedText
       .replace(/^::\s*/, '')
       .replace(/^\(\)\s*/, '')
@@ -37,7 +32,6 @@ export const TyperItemCard: React.FC<TyperItemCardProps> = ({ item, onChange }) 
       .replace(/^OT:\s*/, '')
       .replace(/^\[\]\s*/, '');
 
-    // Apply new prefix based on category
     let prefix = '';
     switch (newCategory) {
       case 'scream':
@@ -71,7 +65,6 @@ export const TyperItemCard: React.FC<TyperItemCardProps> = ({ item, onChange }) 
 
   return (
     <div className="p-4 border rounded-lg bg-card shadow-sm space-y-3">
-      {/* Category Selection Dropdown */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground font-mono">ID: #{item.id}</span>
         <div className="w-40">
@@ -90,14 +83,12 @@ export const TyperItemCard: React.FC<TyperItemCardProps> = ({ item, onChange }) 
         </div>
       </div>
 
-      {/* Original Chinese/Japanese Text */}
       {item.originalText && (
         <div className="text-xs text-muted-foreground bg-muted p-2 rounded dir-ltr text-left font-mono">
           {item.originalText}
         </div>
       )}
 
-      {/* Translated Text Area with Automatic Bidi Direction */}
       <textarea
         className="w-full p-2 text-sm border rounded-md bg-background resize-y min-h-[70px] focus:outline-none focus:ring-1 focus:ring-primary"
         dir="auto"

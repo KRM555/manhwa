@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
-import { TranslationConfig, SampleManga } from '@/types/manga';
-import { Upload, FileArchive, Check, Sparkles, HelpCircle, ExternalLink } from 'lucide-react';
+import { useRef } from 'react';
+import { TranslationConfig } from '@/types/manga';
+import { Upload, FileArchive, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,7 +13,7 @@ interface UploadZoneProps {
   fileName: string | null;
   config: TranslationConfig;
   isAnalyzing: boolean;
-  onImageSelected: (url: string, name: string, sampleData?: SampleManga) => void;
+  onImageSelected: (url: string, name: string) => void;
   onMultipleImagesSelected?: (images: { url: string; name: string }[]) => void;
   onClearImage: () => void;
   onConfigChange: (updated: Partial<TranslationConfig>) => void;
@@ -26,7 +26,6 @@ const UI_TEXT = {
     dropTitle: 'اسحب وأسقط صفحات المانجا / الويب تون هنا',
     dropSubtitle: 'يدعم رفع حتى 10 صور دفعة واحدة أو ملف مضغوط ZIP (PNG, JPG, WEBP)',
     uploadBtn: 'اختر صوراً أو ملف ZIP',
-    sampleTitle: 'أو جرب صفحة تجريبية:',
     controlsTitle: 'إعدادات الترجمة والاستخراج',
     targetLang: 'اللغة المستهدفة للترجمة',
     sfxLabel: 'استخراج المؤثرات الصوتية (SFX)',
@@ -36,13 +35,11 @@ const UI_TEXT = {
     analyzeBtn: 'تحليل واستخراج النصوص',
     analyzingBtn: 'جاري المعالجة بواسطة Gemini...',
     infoNote: 'يتم المعالجة والتعرف الضوئي (OCR) والترجمة في خطوة واحدة ذكية.',
-    limitError: 'الحد الأقصى هو 10 صور فقط',
   },
   en: {
     dropTitle: 'Drag & Drop your Manga / Manhwa pages',
     dropSubtitle: 'Supports uploading up to 10 images or a ZIP archive (PNG, JPG, WEBP, ZIP)',
     uploadBtn: 'Upload Images or ZIP',
-    sampleTitle: 'OR TRY A SAMPLE PAGE:',
     controlsTitle: 'Translation & Extraction Controls',
     targetLang: 'TARGET LANGUAGE',
     sfxLabel: 'Extract Sound Effects (SFX)',
@@ -52,13 +49,11 @@ const UI_TEXT = {
     analyzeBtn: 'Analyze Image',
     analyzingBtn: 'Analyzing with Gemini...',
     infoNote: 'Processes OCR, Text Inpainting & Translation in a single step.',
-    limitError: 'Maximum limit is 10 images',
   },
 };
 
 export function UploadZone({
   imagePreview,
-  fileName,
   config,
   isAnalyzing,
   onImageSelected,
@@ -117,7 +112,6 @@ export function UploadZone({
       return;
     }
 
-    // التعامل مع عدة صور عادية
     const imageFiles = fileList.filter((f) => f.type.startsWith('image/')).slice(0, 10);
     if (imageFiles.length === 0) return;
 
@@ -161,7 +155,6 @@ export function UploadZone({
 
   return (
     <div className="space-y-6 w-full max-w-5xl mx-auto">
-      {/* Drop Zone */}
       <Card
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
@@ -196,7 +189,6 @@ export function UploadZone({
         </div>
       </Card>
 
-      {/* Control Box */}
       <Card className="p-6 border-border rounded-2xl space-y-6 bg-card">
         <h3 className="font-bold text-sm text-foreground flex items-center gap-2 border-b border-border pb-3">
           <span className="w-2 h-2 rounded-full bg-orange-500"></span>

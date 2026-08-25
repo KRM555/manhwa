@@ -1,7 +1,5 @@
-import { MangaPageItem } from '@/types/manga';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 
-// 1. Helper function to download blobs natively
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -13,7 +11,6 @@ const downloadBlob = (blob: Blob, fileName: string) => {
   URL.revokeObjectURL(url);
 };
 
-// 2. Helper to format full script for Photoshop Typer syntax
 export const generateTyperScript = (pages: any[]): string => {
   let script = '';
 
@@ -33,14 +30,12 @@ export const generateTyperScript = (pages: any[]): string => {
   return script;
 };
 
-// 3. Export to Text (.txt)
 export const exportToTxt = (pages: any[]) => {
   const content = generateTyperScript(pages);
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   downloadBlob(blob, `Manga_Translation_Typer_${Date.now()}.txt`);
 };
 
-// 4. Export to Word (.docx)
 export const exportToWord = async (pages: any[]) => {
   const docChildren: Paragraph[] = [];
 
@@ -48,7 +43,6 @@ export const exportToWord = async (pages: any[]) => {
     const pageName = page.fileName || page.name || `Page ${index + 1}`;
     const textItems = page.bubbles || page.items || [];
 
-    // Page Title
     docChildren.push(
       new Paragraph({
         text: `الصفحة ${index + 1} (${pageName})`,
@@ -59,7 +53,6 @@ export const exportToWord = async (pages: any[]) => {
       })
     );
 
-    // Page Bubbles / Text Items
     textItems.forEach((bubble: any) => {
       if (bubble.translatedText) {
         docChildren.push(
@@ -67,7 +60,7 @@ export const exportToWord = async (pages: any[]) => {
             children: [
               new TextRun({
                 text: bubble.translatedText,
-                size: 24, // 12pt
+                size: 24,
               }),
             ],
             bidirectional: true,

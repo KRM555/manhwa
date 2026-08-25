@@ -1,7 +1,6 @@
 import React from 'react';
-import { HelpCircle, ExternalLink, Sparkles, Key, Upload, FileText, CheckCircle2, MessageSquare } from 'lucide-react';
+import { HelpCircle, ExternalLink, Key, Upload, FileText, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 interface SidebarInfoCardsProps {
   lang?: 'ar' | 'en';
@@ -76,11 +75,11 @@ export const SidebarInfoCards: React.FC<SidebarInfoCardsProps> = ({ lang = 'ar' 
         </CardHeader>
         <CardContent className="p-4 space-y-3">
           {steps.map((step) => {
-            const Icon = step.icon;
+            const StepIcon = step.icon;
             return (
               <div key={step.num} className="flex items-start gap-2.5 text-xs">
                 <div className="w-5 h-5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 font-bold flex items-center justify-center shrink-0 mt-0.5 text-[11px]">
-                  {step.num}
+                  <StepIcon className="w-3 h-3" />
                 </div>
                 <div className="space-y-0.5">
                   <p className="font-bold text-foreground leading-tight flex items-center gap-1">

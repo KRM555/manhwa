@@ -10,7 +10,6 @@ import {
   Eye,
   Columns,
   RotateCcw,
-  Sparkles,
   Edit3,
   Check,
   ZoomIn,
@@ -169,7 +168,6 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
             }`}
             style={{ transform: viewMode !== 'side-by-side' ? `scale(${zoom / 100})` : undefined, transformOrigin: 'top center' }}
           >
-            {/* Raw Original */}
             {(viewMode === 'side-by-side' || viewMode === 'original') && (
               <div className="relative rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900">
                 <div className="absolute top-3 left-3 z-10">
@@ -181,7 +179,6 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
               </div>
             )}
 
-            {/* Inpainted & Translated Page */}
             {(viewMode === 'translated' || viewMode === 'side-by-side') && (
               <div className="relative rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900">
                 <div className="absolute top-3 left-3 z-20">
@@ -191,7 +188,6 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
                 </div>
                 <img src={imageSrc} alt="Translated Manga" className="w-full h-auto object-contain" />
 
-                {/* Interactive Overlaid Speech Bubbles */}
                 {bubbles.map((bubble) => {
                   const isSelected = bubble.id === selectedBubbleId;
                   const isArabic = config.targetLanguage === 'ar';
@@ -233,35 +229,33 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
           </div>
         </div>
 
-        {/* Sidebar: Speech Bubble Inspector & Live Text Editor */}
+        {/* Sidebar */}
         <div className="space-y-4">
-        {/* بطاقة الشرح ودعم الديسكورد */}
-      <div className="p-4 border border-border shadow-sm rounded-2xl bg-card space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-border/50">
-          <h3 className="text-xs font-bold text-orange-500">
-            📖 طريقة الاستخدام
-          </h3>
-          
-          {/* أيقونة ديسكورد كزر للتحويل المباشر */}
-          <a
-            href="https://discord.gg/nuaqTHvx"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="الدعم والشكاوى عبر Discord"
-            className="p-1.5 rounded-xl bg-[#5865F2]/10 text-[#5865F2] hover:bg-[#5865F2] hover:text-white transition-all duration-200"
-          >
-            <svg className="w-5 h-5 fill-current" viewBox="0 0 127.14 96.36">
-              <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.68 1.76 1.36 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15z" />
-            </svg>
-          </a>
-        </div>
+          <div className="p-4 border border-border shadow-sm rounded-2xl bg-card space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/50">
+              <h3 className="text-xs font-bold text-orange-500">
+                📖 طريقة الاستخدام
+              </h3>
+              <a
+                href="https://discord.gg/nuaqTHvx"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="الدعم والشكاوى عبر Discord"
+                className="p-1.5 rounded-xl bg-[#5865F2]/10 text-[#5865F2] hover:bg-[#5865F2] hover:text-white transition-all duration-200"
+              >
+                <svg className="w-5 h-5 fill-current" viewBox="0 0 127.14 96.36">
+                  <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.68 1.76 1.36 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15z" />
+                </svg>
+              </a>
+            </div>
 
-        <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
-          <li>اضغط على أي فقرة في الصفحة لتحديدها.</li>
-          <li>عدّل النص المترجم في الخانة بالأسفل.</li>
-          <li>احفظ التعديلات وقم بتصدير النص النهائي.</li>
-        </ol>
-      </div>
+            <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
+              <li>اضغط على أي فقرة في الصفحة لتحديدها.</li>
+              <li>عدّل النص المترجم في الخانة بالأسفل.</li>
+              <li>احفظ التعديلات وقم بتصدير النص النهائي.</li>
+            </ol>
+          </div>
+
           <Card className="rounded-2xl border-border shadow-sm">
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-border">
@@ -301,7 +295,6 @@ export const TranslationViewer: React.FC<TranslationViewerProps> = ({
                     />
                   </div>
 
-                  {/* Bubble List Selector */}
                   <div className="pt-2 border-t border-border space-y-2">
                     <Label className="text-[11px] font-bold uppercase text-muted-foreground">All Detected Bubbles</Label>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">

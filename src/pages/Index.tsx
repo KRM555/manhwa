@@ -539,15 +539,32 @@ export default function Index() {
     setIsAnalyzing(true);
     toast.info(lang === 'ar' ? `جاري تحليل كل الصور (${images.length})...` : `Analyzing all ${images.length} images...`);
 
+    const { data: { session } } = await supabase.auth.getSession();
     const newMap = { ...resultsMap };
+
     for (const img of images) {
       const res = await processGeminiRequest(img, ocrOnly);
-      if (res) newMap[img.id] = res;
+      if (res) {
+        newMap[img.id] = res;
+
+        // حفظ كل صورة تترجم بنجاح في سجل Supabase
+        if (session?.user) {
+          const { error } = await supabase.from('user_history').insert({
+            user_id: session.user.id,
+            image_name: img.name,
+            extracted_count: res.length,
+          });
+
+          if (error) {
+            console.error(`فشل حفظ الصورة ${img.name}:`, error.message);
+          }
+        }
+      }
     }
 
     setResultsMap(newMap);
     setIsAnalyzing(false);
-    toast.success(lang === 'ar' ? 'تمت معالجة كافة الصور بنجاح!' : 'All images processed successfully!');
+    toast.success(lang === 'ar' ? 'أتمت معالجة كافة الصور بنجاح!' : 'All images processed successfully!');
     setView('results');
   };
 

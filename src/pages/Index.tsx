@@ -662,7 +662,122 @@ export default function Index() {
                 {t.glossaryTitle} ({glossary.length})
               </Button>
             </DialogTrigger>
-            {/* باقي كود الـ Dialog الخاص بالقاموس هنا... */}
+            <DialogContent className="sm:max-w-[550px] dir-rtl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <BookOpen className="w-5 h-5 text-orange-500" />
+                  {t.glossaryTitle}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder={t.origTerm}
+                    value={newOrigTerm}
+                    onChange={(e) => setNewOrigTerm(e.target.value)}
+                    className="text-xs"
+                  />
+                  <Input
+                    placeholder={t.transTerm}
+                    value={newTransTerm}
+                    onChange={(e) => setNewTransTerm(e.target.value)}
+                    className="text-xs"
+                  />
+                </div>
+                <Button onClick={handleAddGlossaryItem} className="w-full h-8 text-xs bg-orange-500 hover:bg-orange-600">
+                  <Plus className="w-4 h-4 ml-1" />
+                  {t.addGlossary}
+                </Button>
+                <div className="max-h-60 overflow-y-auto space-y-2 border rounded-lg p-2">
+                  {glossary.length === 0 ? (
+                    <p className="text-xs text-center text-muted-foreground py-4">لا توجد مصطلحات مضافة بعد</p>
+                  ) : (
+                    glossary.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded">
+                        <span className="font-semibold text-orange-600">{item.original}</span>
+                        <span className="text-muted-foreground">←</span>
+                        <span>{item.translated}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveGlossaryItem(idx)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* نافذة إعدادات العلامات (Tag Settings) */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 hover:bg-orange-500/10">
+                <SlidersHorizontal className="w-4 h-4 text-orange-500" />
+                {t.tagSettings}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] dir-rtl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <SlidersHorizontal className="w-5 h-5 text-orange-500" />
+                  {t.tagSettings}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-3">
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold">{t.addNewTag}</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input
+                      placeholder={t.tagName}
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      className="text-xs"
+                    />
+                    <Input
+                      placeholder={t.tagPrefix}
+                      value={newTagPrefix}
+                      onChange={(e) => setNewTagPrefix(e.target.value)}
+                      className="text-xs dir-ltr"
+                    />
+                    <Input
+                      placeholder={t.tagSuffix}
+                      value={newTagSuffix}
+                      onChange={(e) => setNewTagSuffix(e.target.value)}
+                      className="text-xs dir-ltr"
+                    />
+                  </div>
+                  <Button onClick={handleAddCustomTag} className="w-full h-8 text-xs bg-orange-500 hover:bg-orange-600">
+                    <Plus className="w-4 h-4 ml-1" />
+                    {t.add}
+                  </Button>
+                </div>
+
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold">العلامات الحالية</span>
+                    <Button variant="ghost" className="h-7 text-xs text-orange-500" onClick={handleResetTags}>
+                      <RotateCcw className="w-3.5 h-3.5 ml-1" />
+                      {t.resetDefaultTags}
+                    </Button>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto space-y-1.5 border rounded-lg p-2">
+                    {customTags.map((tag) => (
+                      <div key={tag.id} className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded">
+                        <span className="font-medium">{tag.name}</span>
+                        <code className="text-[10px] bg-background px-1.5 py-0.5 rounded dir-ltr border">
+                          {tag.prefix}النص{tag.suffix}
+                        </code>
+                        {tag.isCustom && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteTag(tag.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
           </Dialog>
 
           {/* رابط وخانة إدخال المفتاح */}
@@ -683,7 +798,7 @@ export default function Index() {
               {t.getKeyLabel}
             </a>
           </div>
-        </div> {/* <-- هذا هو وسم الإغلاق الذي كان مفقوداً للسطر 643 */}
+        </div>
       </header>
 
       {/* Bar for images */}

@@ -65,12 +65,6 @@ const DEFAULT_TAGS: TagRule[] = [
   { value: 'other', label: 'أخرى (Other)', prefix: '', suffix: '' },
 ];
 
-const FALLBACK_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-pro',
-];
-
 const UI_TEXT = {
   ar: {
     subtitle: 'أداة استخراج وترجمة وتنسيق سكريبتات الويب تون والمانجا',
@@ -270,28 +264,9 @@ export default function Index() {
   const activeImage = images[activeImageIndex] || null;
   const currentItems = activeImage ? (resultsMap[activeImage.id] || []) : [];
 
-  // Thorough sanitization of the API key
+  // Strip all invisible characters, spaces, quotes
   const cleanApiKey = apiKey.replace(/[\s\r\n\t"']/g, '').trim();
   const isKeyFormatSuspicious = cleanApiKey.length > 0 && !cleanApiKey.startsWith('AIzaSy');
-
-  const fetchAvailableModels = async (key: string): Promise<string[]> => {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, {
-        headers: { 'x-goog-api-key': key }
-      });
-      if (!res.ok) return [];
-      const data = await res.json();
-      if (Array.isArray(data?.models)) {
-        const supported = data.models
-          .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
-          .map((m: any) => m.name.replace('models/', ''));
-        if (supported.length > 0) return supported;
-      }
-    } catch (e) {
-      console.warn('Model list fetch failed', e);
-    }
-    return [];
-  };
 
   const handleTestApiKey = async () => {
     if (!cleanApiKey) {
@@ -301,10 +276,7 @@ export default function Index() {
     setIsTestingKey(true);
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`,
-        {
-          headers: { 'x-goog-api-key': cleanApiKey }
-        }
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
       );
       const data = await res.json();
       
@@ -556,62 +528,70 @@ ${glossaryPrompt}
 ${refContextPrompt}
 Return ONLY a valid JSON array of objects with keys: id, originalText, translatedText, category, topPercent.`;
 
-    const liveModels = await fetchAvailableModels(cleanApiKey);
-    const modelsToTry = liveModels.length > 0 ? liveModels : FALLBACK_MODELS;
+    const candidateModels = [
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro'
+    ];
 
     let lastErrorDetails = '';
 
-    for (const model of modelsToTry) {
-      for (const apiVersion of ['v1beta', 'v1']) {
-        try {
-          const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${cleanApiKey}`;
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-api-key': cleanApiKey,
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { inlineData: { mimeType, data: base64Data } },
-                    { text: promptText },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.1,
-                responseMimeType: 'application/json',
+    for (const model of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanApiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { inlineData: { mimeType, data: base64Data } },
+                  { text: promptText },
+                ],
               },
-            }),
-          });
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
 
-          if (!response.ok) {
-            const errBody = await response.json().catch(() => null);
-            const msg = errBody?.error?.message || `HTTP ${response.status} (${response.statusText})`;
-            lastErrorDetails = `[${model} - ${apiVersion}]: ${msg}`;
-            continue;
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => null);
+          const msg = errBody?.error?.message || `HTTP ${response.status} (${response.statusText})`;
+          lastErrorDetails = msg;
+
+          // If 401 (Invalid API Key) or 403, do not keep trying other models in vain
+          if (response.status === 401 || response.status === 403) {
+            return { 
+              data: null, 
+              error: `[401 Unauthorized] مفتاح API غير صالح أو غير معتمد من Google AI Studio: ${msg}` 
+            };
           }
-
-          const data = await response.json();
-          const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-          if (rawJsonText) {
-            const parsedItems = parseJsonFromResponse(rawJsonText);
-            if (parsedItems && Array.isArray(parsedItems)) {
-              const formatted = parsedItems.map((item, idx) => ({
-                ...item,
-                id: item.id || `item_${idx}_${Date.now()}`,
-                topPercent: item.topPercent ?? Math.min(95, Math.max(5, (idx + 1) * 15)),
-                translatedText: ocrOnly ? item.originalText : item.translatedText,
-              }));
-              return { data: formatted };
-            }
-          }
-        } catch (err: any) {
-          lastErrorDetails = err?.message || 'Network fetch error';
+          continue;
         }
+
+        const data = await response.json();
+        const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (rawJsonText) {
+          const parsedItems = parseJsonFromResponse(rawJsonText);
+          if (parsedItems && Array.isArray(parsedItems)) {
+            const formatted = parsedItems.map((item, idx) => ({
+              ...item,
+              id: item.id || `item_${idx}_${Date.now()}`,
+              topPercent: item.topPercent ?? Math.min(95, Math.max(5, (idx + 1) * 15)),
+              translatedText: ocrOnly ? item.originalText : item.translatedText,
+            }));
+            return { data: formatted };
+          }
+        }
+      } catch (err: any) {
+        lastErrorDetails = err?.message || 'Network fetch error';
       }
     }
 
@@ -681,6 +661,10 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
         successCount++;
       } else if (error) {
         lastError = error;
+        // If 401, stop the loop immediately
+        if (error.includes('401') || error.includes('Unauthorized')) {
+          break;
+        }
       }
     }
 
@@ -758,8 +742,10 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          {/* زر تسجيل الدخول والبروفايل */}
           <AuthModal />
 
+          {/* زر مشروع جديد */}
           <Button
             variant="outline"
             onClick={handleClearAllImages}
@@ -769,6 +755,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             {t.newProject}
           </Button>
 
+          {/* نافذة القاموس */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 dark:text-orange-400">
@@ -808,6 +795,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             </DialogContent>
           </Dialog>
 
+          {/* إعدادات العلامات */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl">
@@ -870,6 +858,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             </DialogContent>
           </Dialog>
 
+          {/* نافذة كيفية الاستخدام (Tutorial) */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="ghost" className="h-9 gap-1 text-xs font-bold px-2 rounded-xl text-muted-foreground hover:text-orange-500">
@@ -892,6 +881,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             </DialogContent>
           </Dialog>
 
+          {/* زر ديسكورد مع مسار SVG نظيف */}
           <a 
             href="https://discord.gg/nuaqTHvx" 
             target="_blank" 
@@ -899,8 +889,8 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             className="h-9 w-9 rounded-xl inline-flex items-center justify-center border border-input bg-background hover:bg-[#5865F2] hover:text-white hover:border-[#5865F2] transition-colors"
             title="انضم لسيرفر الديسكورد"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M13.545 2.907a13.227 13.227 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.19 12.19 0 0 0-3.658 0 8.258 8.258 0 0 0-.412-.833.051.051 0 0 0-.052-.025-1.125.194-2.22.534-3.257 1.011a.041.041 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032c.001.014.01.028.021.037a13.276 13.276 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019c.308-.42.582-.863.818-1.329a.05.05 0 0 0-.01-.059.051.051 0 0 0-.018-.011 8.875 8.875 0 0 1-1.248-.595.05.05 0 0 1-.02-.066.051.051 0 0 1 .015-.019c.084-.063.168-.129.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.052.052 0 0 1 .053.007c.08.066.164.132.248.195a.051.051 0 0 1-.004.085 8.254 8.254 0 0 1-1.249.594.05.05 0 0 0-.03.03.052.052 0 0 0 .003.029"/>
+            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .079.009c.12.098.245.195.372.288a.077.077 0 0 1-.006.128 12.299 12.299 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
             </svg>
           </a>
 

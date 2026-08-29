@@ -963,8 +963,8 @@ export default function Index() {
     setIsTestingKey(true);
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
-      );
+  `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
+);
       const data = await res.json();
       
       if (res.ok && data?.models) {
@@ -981,7 +981,7 @@ export default function Index() {
       }
     } // إغلاق كتلة else
   } // إغلاق كتلة try
-} catch (err) {
+ try{}  catch (err) {
   toast.error(`❌ الاتصال تعذر: ${err instanceof Error ? err.message : "خطأ غير معروف"}`);
 } finally {
   setIsTestingKey(false);

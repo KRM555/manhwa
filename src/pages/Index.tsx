@@ -9,7 +9,7 @@ import {
   Sun, Moon, Languages, Images, Trash2,
   ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
   Copy, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
-  BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2, CheckCircle, AlertTriangle, KeyRound
+  BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2, CheckCircle, AlertTriangle, KeyRound, Cpu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -65,11 +65,12 @@ const DEFAULT_TAGS: TagRule[] = [
   { value: 'other', label: 'أخرى (Other)', prefix: '', suffix: '' },
 ];
 
-const DEFAULT_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-  'gemini-1.0-pro'
+const AVAILABLE_MODELS = [
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (الأسرع والأحدث)' },
+  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (سريع ودقيق)' },
+  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (أعلى جودة وسياق)' },
+  { id: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental' },
+  { id: 'custom', label: 'نموذج مخصص (Custom Model)...' }
 ];
 
 const UI_TEXT = {
@@ -124,6 +125,7 @@ const UI_TEXT = {
     uploadReference: 'إرفاق ملف ترجمة سابقة كمرجع (اختياري)',
     referenceUploaded: 'تم إرفاق المرجع:',
     testApiKey: 'فحص واختبار المفتاح',
+    selectModel: 'النموذج المستخدم',
   },
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
@@ -176,6 +178,7 @@ const UI_TEXT = {
     uploadReference: 'Upload previous translation reference (Optional)',
     referenceUploaded: 'Reference uploaded:',
     testApiKey: 'Test API Key',
+    selectModel: 'Selected Model',
   },
 };
 
@@ -197,6 +200,11 @@ export default function Index() {
   const [apiKey, setApiKey] = useState<string>(() => {
     return localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
   });
+
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    return localStorage.getItem('gemini_selected_model') || 'gemini-2.0-flash';
+  });
+  const [customModelName, setCustomModelName] = useState<string>('');
 
   const [config, setConfig] = useState<TranslationConfig>({
     targetLanguage: 'ar',
@@ -234,6 +242,10 @@ export default function Index() {
   const [referenceText, setReferenceText] = useState<string>('');
   const [referenceFileName, setReferenceFileName] = useState<string>('');
   const [showKeyHelpModal, setShowKeyHelpModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem('gemini_selected_model', selectedModel);
+  }, [selectedModel]);
 
   useEffect(() => {
     localStorage.setItem('custom_manga_tags', JSON.stringify(tags));
@@ -274,6 +286,13 @@ export default function Index() {
   // Strip spaces and surrounding quotes cleanly
   const cleanApiKey = apiKey.replace(/[\s\r\n\t"']/g, '').trim();
 
+  const getEffectiveModel = () => {
+    if (selectedModel === 'custom' && customModelName.trim()) {
+      return customModelName.trim();
+    }
+    return selectedModel || 'gemini-2.0-flash';
+  };
+
   const handleTestApiKey = async () => {
     if (!cleanApiKey) {
       toast.error(t.enterApiKey);
@@ -290,8 +309,8 @@ export default function Index() {
       if (res.ok && data?.models) {
         toast.success(
           lang === 'ar' 
-            ? '✅ المفتاح صحيح وفعال 100%! متصل بنجاح مع Google Gemini.' 
-            : '✅ Gemini API Key is valid and successfully connected!'
+            ? `✅ المفتاح صحيح وفعال 100%! متصل بنجاح مع Google Gemini (${data.models.length} نماذج متاحة).` 
+            : `✅ Gemini API Key is valid! (${data.models.length} models available).`
         );
       } else {
         const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
@@ -537,9 +556,17 @@ ${glossaryPrompt}
 ${refContextPrompt}
 Return ONLY a valid JSON array of objects with keys: id, originalText, translatedText, category, topPercent.`;
 
+    const primaryModel = getEffectiveModel();
+    const modelsToTry = [
+      primaryModel,
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+    ].filter((m, idx, arr) => arr.indexOf(m) === idx);
+
     let lastErrorDetails = '';
 
-    for (const model of DEFAULT_MODELS) {
+    for (const model of modelsToTry) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanApiKey}`;
         const response = await fetch(url, {
@@ -571,7 +598,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
           if (response.status === 401 || response.status === 403) {
             return { 
               data: null, 
-              error: `[Google 401] ${msg}` 
+              error: `[Google ${response.status}] ${msg}` 
             };
           }
           continue;
@@ -612,7 +639,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
     }
 
     setIsAnalyzing(true);
-    setCurrentProcessingMsg(lang === 'ar' ? 'جاري معالجة واستخراج نصوص الصفحة...' : 'Processing and extracting text...');
+    setCurrentProcessingMsg(lang === 'ar' ? `جاري معالجة واستخراج النصوص بواسطة ${getEffectiveModel()}...` : `Processing with ${getEffectiveModel()}...`);
 
     const { data: res, error } = await processGeminiRequest(activeImage, ocrOnly);
     if (res && res.length > 0) {
@@ -632,7 +659,668 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
       }
     } else {
       const errorMsg = error || (lang === 'ar' ? 'تحقق من صلاحية مفتاح الـ API' : 'Check your API Key');
-      toast.error(`❌ خطأ من Google: ${errorMsg}`, { duration: 8000 });
+      toast.error(`❌<dyad-write path="src/pages/Index.tsx" description="Complete the Index.tsx file with full model selector and UI pipeline">
+import { AuthModal } from '@/components/AuthModal';
+import { supabase } from '@/lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { UploadZone } from '@/components/UploadZone';
+import { SidebarInfoCards } from '@/components/SidebarInfoCards';
+import { TranslationConfig } from '@/types/manga';
+import { 
+  ArrowLeft, Download, Sparkles, RefreshCw, 
+  Sun, Moon, Languages, Images, Trash2,
+  ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
+  Copy, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
+  BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2, CheckCircle, AlertTriangle, KeyRound, Cpu
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
+
+export interface ExtractedText {
+  id: string;
+  originalText: string;
+  translatedText: string;
+  category: string;
+  topPercent?: number;
+}
+
+interface ImageItem {
+  id: string;
+  url: string;
+  name: string;
+}
+
+export interface TagRule {
+  value: string;
+  label: string;
+  prefix: string;
+  suffix: string;
+}
+
+export interface GlossaryItem {
+  id: string;
+  original: string;
+  translation: string;
+}
+
+const DEFAULT_TAGS: TagRule[] = [
+  { value: 'dialogue', label: 'حوار (Dialogue)', prefix: '"": ', suffix: '' },
+  { value: 'thought', label: 'أفكار (Thought)', prefix: '(): ', suffix: '' },
+  { value: 'scream', label: 'صراخ (Scream)', prefix: '<>: ', suffix: '' },
+  { value: 'system', label: 'نظام (System)', prefix: '[]: ', suffix: '' },
+  { value: 'phone', label: 'هاتف (Phone)', prefix: '**: ', suffix: '' },
+  { value: 'narrator', label: 'راوي (Narrator)', prefix: 'NA: ', suffix: '' },
+  { value: 'sfx', label: 'مؤثر صوتي (SFX)', prefix: 'sfx: ', suffix: '' },
+  { value: 'whisper', label: 'همس (Whisper)', prefix: 'ST: ', suffix: '' },
+  { value: 'other', label: 'أخرى (Other)', prefix: '', suffix: '' },
+];
+
+const AVAILABLE_MODELS = [
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (الأسرع والأحدث)' },
+  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (سريع ودقيق)' },
+  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (أعلى جودة وسياق)' },
+  { id: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental' },
+  { id: 'custom', label: 'نموذج مخصص (Custom Model)...' }
+];
+
+const UI_TEXT = {
+  ar: {
+    subtitle: 'أداة استخراج وترجمة وتنسيق سكريبتات الويب تون والمانجا',
+    apiLabel: 'مفتاح Gemini API:',
+    apiKeyPlaceholder: 'AIzaSy... أو مفتاحك الخاص',
+    backToUpload: 'العودة للرفع',
+    reAnalyze: 'إعادة التحليل',
+    analyzeAll: 'تحليل كافة الصور',
+    extractOcrOnly: 'استخراج النص فقط (OCR)',
+    exportOriginal: 'تصدير النص الأصلي (OCR)',
+    exportTranslated: 'تصدير النص المترجم',
+    exportCurrentPage: 'الصفحة الحالية فقط',
+    exportAllPages: 'كافة الصفحات',
+    pagePreview: 'معاينة الصفحة',
+    extractedTexts: 'النصوص المستخرجة',
+    originalText: 'النص الأصلي:',
+    translatedText: 'النص المترجم / الناتج:',
+    noImage: 'لا توجد صورة محددة',
+    page: 'صفحة',
+    multiImageLimit: 'الحد الأقصى هو 10 صور فقط',
+    paragraph: 'فقرة',
+    selectImageFirst: 'الرجاء اختيار صورة واحدة على الأقل',
+    enterApiKey: 'يرجى إدخال مفتاح Gemini API أولاً',
+    analyzing: 'جاري معالجة واستخراج النصوص بواسطة Gemini...',
+    successExtract: 'تم استخراج النصوص بنجاح!',
+    noItemsToExport: 'لا توجد نصوص لتصديرها لهذه الصفحة',
+    clearAll: 'حذف الكل',
+    tagSettings: 'إعدادات العلامات',
+    addNewTag: 'إضافة علامة جديدة',
+    tagName: 'اسم العلامة',
+    tagPrefix: 'البادئة',
+    tagSuffix: 'اللاحقة',
+    add: 'إضافة',
+    resetDefaultTags: 'استعادة العلامات الافتراضية',
+    newProject: 'مشروع جديد',
+    copyBlock: 'نسخ الفقرة',
+    copyAllPage: 'نسخ نصوص الصفحة',
+    copied: 'تم النسخ!',
+    findReplace: 'البحث والاستبدال',
+    findPlaceholder: 'بحث عن كلمة...',
+    replacePlaceholder: 'استبدال بـ...',
+    replaceCurrentPage: 'في هذه الصفحة',
+    replaceAllPages: 'في كل الصفحات',
+    glossaryTitle: 'قاموس المصطلحات والأسماء',
+    origTerm: 'الاسم/المصطلح الأصلي',
+    transTerm: 'الترجمة المعتمدة',
+    addGlossary: 'إضافة للقاموس',
+    visualOverlay: 'المعاينة البصرية النصية',
+    howToUse: 'كيفية الاستخدام',
+    uploadReference: 'إرفاق ملف ترجمة سابقة كمرجع (اختياري)',
+    referenceUploaded: 'تم إرفاق المرجع:',
+    testApiKey: 'فحص واختبار المفتاح',
+    selectModel: 'النموذج المستخدم',
+  },
+  en: {
+    subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
+    apiLabel: 'Gemini API Key:',
+    apiKeyPlaceholder: 'AIzaSy... or your API key',
+    backToUpload: 'Back to Upload',
+    reAnalyze: 'Re-analyze',
+    analyzeAll: 'Analyze All Images',
+    extractOcrOnly: 'Extract Text Only (OCR)',
+    exportOriginal: 'Export Original (OCR)',
+    exportTranslated: 'Export Translated',
+    exportCurrentPage: 'Current Page Only',
+    exportAllPages: 'All Pages',
+    pagePreview: 'Page Preview',
+    extractedTexts: 'Extracted Texts',
+    originalText: 'Original Text:',
+    translatedText: 'Translated / Result Text:',
+    noImage: 'No image selected',
+    page: 'Page',
+    multiImageLimit: 'Maximum limit is 10 images',
+    paragraph: 'Block',
+    selectImageFirst: 'Please select at least one image',
+    enterApiKey: 'Please enter your Gemini API Key first',
+    analyzing: 'Processing text with Gemini...',
+    successExtract: 'Texts successfully extracted!',
+    noItemsToExport: 'No texts available to export',
+    clearAll: 'Clear All',
+    tagSettings: 'Tag Formatting',
+    addNewTag: 'Add Custom Tag',
+    tagName: 'Tag Name',
+    tagPrefix: 'Prefix',
+    tagSuffix: 'Suffix',
+    add: 'Add Tag',
+    resetDefaultTags: 'Reset Default Tags',
+    newProject: 'New Project',
+    copyBlock: 'Copy Block',
+    copyAllPage: 'Copy Page Texts',
+    copied: 'Copied!',
+    findReplace: 'Find & Replace',
+    findPlaceholder: 'Find text...',
+    replacePlaceholder: 'Replace with...',
+    replaceCurrentPage: 'Current Page',
+    replaceAllPages: 'All Pages',
+    glossaryTitle: 'Character & Term Glossary',
+    origTerm: 'Original Name/Term',
+    transTerm: 'Approved Translation',
+    addGlossary: 'Add to Glossary',
+    visualOverlay: 'Visual Text Overlay',
+    howToUse: 'How to Use',
+    uploadReference: 'Upload previous translation reference (Optional)',
+    referenceUploaded: 'Reference uploaded:',
+    testApiKey: 'Test API Key',
+    selectModel: 'Selected Model',
+  },
+};
+
+export default function Index() {
+  const [images, setImages] = useState<ImageItem[]>(() => {
+    const saved = localStorage.getItem('manga_studio_images');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  const [view, setView] = useState<'upload' | 'results'>('upload');
+  
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
+  const [currentProcessingMsg, setCurrentProcessingMsg] = useState<string>('');
+
+  const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+
+  const [apiKey, setApiKey] = useState<string>(() => {
+    return localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
+  });
+
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    return localStorage.getItem('gemini_selected_model') || 'gemini-2.0-flash';
+  });
+  const [customModelName, setCustomModelName] = useState<string>('');
+
+  const [config, setConfig] = useState<TranslationConfig>({
+    targetLanguage: 'ar',
+    extractSFX: true,
+    detectVerticalText: true,
+  });
+
+  const [resultsMap, setResultsMap] = useState<Record<string, ExtractedText[]>>(() => {
+    const saved = localStorage.getItem('manga_studio_results');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [tags, setTags] = useState<TagRule[]>(() => {
+    const saved = localStorage.getItem('custom_manga_tags');
+    return saved ? JSON.parse(saved) : DEFAULT_TAGS;
+  });
+
+  const [glossary, setGlossary] = useState<GlossaryItem[]>(() => {
+    const saved = localStorage.getItem('manga_glossary');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newGlossaryOrig, setNewGlossaryOrig] = useState('');
+  const [newGlossaryTrans, setNewGlossaryTrans] = useState('');
+
+  const [showOverlay, setShowOverlay] = useState<boolean>(false);
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
+  const [newTagLabel, setNewTagLabel] = useState('');
+  const [newTagPrefix, setNewTagPrefix] = useState('');
+  const [newTagSuffix, setNewTagSuffix] = useState('');
+
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+
+  const [referenceText, setReferenceText] = useState<string>('');
+  const [referenceFileName, setReferenceFileName] = useState<string>('');
+  const [showKeyHelpModal, setShowKeyHelpModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem('gemini_selected_model', selectedModel);
+  }, [selectedModel]);
+
+  useEffect(() => {
+    localStorage.setItem('custom_manga_tags', JSON.stringify(tags));
+  }, [tags]);
+
+  useEffect(() => {
+    localStorage.setItem('manga_glossary', JSON.stringify(glossary));
+  }, [glossary]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('manga_studio_results', JSON.stringify(resultsMap));
+    } catch (e) {
+      console.warn('Storage limit reached for results');
+    }
+  }, [resultsMap]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('manga_studio_images', JSON.stringify(images));
+    } catch (e) {
+      console.warn('Storage limit reached for images');
+    }
+  }, [images]);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const t = UI_TEXT[lang];
+  const activeImage = images[activeImageIndex] || null;
+  const currentItems = activeImage ? (resultsMap[activeImage.id] || []) : [];
+
+  const cleanApiKey = apiKey.replace(/[\s\r\n\t"']/g, '').trim();
+
+  const getEffectiveModel = () => {
+    if (selectedModel === 'custom' && customModelName.trim()) {
+      return customModelName.trim();
+    }
+    return selectedModel || 'gemini-2.0-flash';
+  };
+
+  const handleTestApiKey = async () => {
+    if (!cleanApiKey) {
+      toast.error(t.enterApiKey);
+      return;
+    }
+
+    setIsTestingKey(true);
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
+      );
+      const data = await res.json();
+      
+      if (res.ok && data?.models) {
+        toast.success(
+          lang === 'ar' 
+            ? `✅ المفتاح صحيح وفعال 100%! متصل بنجاح مع Google Gemini (${data.models.length} نماذج متاحة).` 
+            : `✅ Gemini API Key is valid! (${data.models.length} models available).`
+        );
+      } else {
+        const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        toast.error(`❌ خطأ من Google: ${errMsg}`, { duration: 6000 });
+        if (cleanApiKey.startsWith('AQ.')) {
+          setShowKeyHelpModal(true);
+        }
+      }
+    } catch (err: any) {
+      toast.error(`❌ تعذر الاتصال: ${err.message}`);
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
+
+  const handleImageSelected = (url: string, name: string) => {
+    if (images.length >= 10) {
+      toast.error(t.multiImageLimit);
+      return;
+    }
+    const newImage: ImageItem = { id: `img_${Date.now()}_${Math.random()}`, url, name };
+    setImages((prev) => [...prev, newImage]);
+    setActiveImageIndex(images.length);
+  };
+
+  const handleMultipleImagesSelected = (newImages: { url: string; name: string }[]) => {
+    const formatted = newImages.map((img) => ({
+      id: `img_${Date.now()}_${Math.random()}`,
+      url: img.url,
+      name: img.name,
+    }));
+    setImages((prev) => [...prev, ...formatted].slice(0, 10));
+    setActiveImageIndex(0);
+  };
+
+  const handleRemoveImage = (index: number) => {
+    const imgToRemove = images[index];
+    const updated = images.filter((_, i) => i !== index);
+    setImages(updated);
+    
+    if (imgToRemove) {
+      const newMap = { ...resultsMap };
+      delete newMap[imgToRemove.id];
+      setResultsMap(newMap);
+    }
+
+    if (activeImageIndex >= updated.length) {
+      setActiveImageIndex(Math.max(0, updated.length - 1));
+    }
+  };
+
+  const handleClearAllImages = () => {
+    setImages([]);
+    setActiveImageIndex(0);
+    setResultsMap({});
+    setReferenceText('');
+    setReferenceFileName('');
+    localStorage.removeItem('manga_studio_results');
+    localStorage.removeItem('manga_studio_images');
+    toast.success(lang === 'ar' ? 'تم بدء مشروع جديد' : 'New project started');
+  };
+
+  const handleSaveApiKey = (key: string) => {
+    const cleaned = key.replace(/[\s\r\n\t"']/g, '').trim();
+    setApiKey(cleaned);
+    localStorage.setItem('gemini_api_key', cleaned);
+  };
+
+  const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setReferenceText(event.target?.result as string);
+      setReferenceFileName(file.name);
+      toast.success(lang === 'ar' ? 'تم استيراد المرجع بنجاح!' : 'Reference imported!');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleAddCustomTag = () => {
+    if (!newTagLabel.trim()) return;
+    const val = `custom_${Date.now()}`;
+    const newTag: TagRule = {
+      value: val,
+      label: newTagLabel,
+      prefix: newTagPrefix,
+      suffix: newTagSuffix,
+    };
+    setTags([...tags, newTag]);
+    setNewTagLabel('');
+    setNewTagPrefix('');
+    setNewTagSuffix('');
+    toast.success(lang === 'ar' ? 'تمت إضافة العلامة!' : 'Tag added!');
+  };
+
+  const handleDeleteTag = (index: number) => {
+    if (tags.length <= 1) return;
+    setTags(tags.filter((_, i) => i !== index));
+  };
+
+  const handleAddGlossaryItem = () => {
+    if (!newGlossaryOrig.trim() || !newGlossaryTrans.trim()) return;
+    const item: GlossaryItem = {
+      id: `g_${Date.now()}`,
+      original: newGlossaryOrig.trim(),
+      translation: newGlossaryTrans.trim(),
+    };
+    setGlossary([...glossary, item]);
+    setNewGlossaryOrig('');
+    setNewGlossaryTrans('');
+    toast.success(lang === 'ar' ? 'تمت إضافة المصطلح' : 'Term added');
+  };
+
+  const handleDeleteGlossaryItem = (id: string) => {
+    setGlossary(glossary.filter((item) => item.id !== id));
+  };
+
+  const formatTextWithRules = (text: string, categoryVal: string): string => {
+    const cleanText = text.trim();
+    const rule = tags.find((t) => t.value === categoryVal);
+    if (!rule) return cleanText;
+    return `${rule.prefix}${cleanText}${rule.suffix}`;
+  };
+
+  const handleMoveItem = (index: number, direction: 'up' | 'down') => {
+    if (!activeImage) return;
+    const items = [...currentItems];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+
+    const temp = items[index];
+    items[index] = items[targetIndex];
+    items[targetIndex] = temp;
+
+    setResultsMap((prev) => ({ ...prev, [activeImage.id]: items }));
+  };
+
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(t.copied);
+  };
+
+  const handleCopyPageFormatted = () => {
+    if (currentItems.length === 0) return;
+    const fullText = currentItems
+      .map((item) => formatTextWithRules(item.translatedText, item.category))
+      .join('\n\n');
+    navigator.clipboard.writeText(fullText);
+    toast.success(t.copied);
+  };
+
+  const handleFindAndReplace = (scope: 'current' | 'all') => {
+    if (!findText.trim()) return;
+
+    let totalReplacements = 0;
+    const newMap = { ...resultsMap };
+
+    const processList = (list: ExtractedText[]) => {
+      return list.map((item) => {
+        let updatedTranslated = item.translatedText;
+        if (updatedTranslated.includes(findText)) {
+          const count = updatedTranslated.split(findText).length - 1;
+          totalReplacements += count;
+          updatedTranslated = updatedTranslated.split(findText).join(replaceText);
+        }
+        return { ...item, translatedText: updatedTranslated };
+      });
+    };
+
+    if (scope === 'current' && activeImage) {
+      if (newMap[activeImage.id]) {
+        newMap[activeImage.id] = processList(newMap[activeImage.id]);
+      }
+    } else {
+      Object.keys(newMap).forEach((imgId) => {
+        newMap[imgId] = processList(newMap[imgId]);
+      });
+    }
+
+    setResultsMap(newMap);
+    toast.success(
+      lang === 'ar'
+        ? `تم استبدال الكلمة ${totalReplacements} مرة!`
+        : `Replaced ${totalReplacements} occurrences!`
+    );
+  };
+
+  const parseJsonFromResponse = (raw: string): ExtractedText[] | null => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      const match = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (match) {
+        try {
+          return JSON.parse(match[1]);
+        } catch {
+          // ignore
+        }
+      }
+      const firstBracket = raw.indexOf('[');
+      const lastBracket = raw.lastIndexOf(']');
+      if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+        try {
+          return JSON.parse(raw.substring(firstBracket, lastBracket + 1));
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return null;
+  };
+
+  const processGeminiRequest = async (targetImg: ImageItem, ocrOnly = false): Promise<{ data: ExtractedText[] | null; error?: string }> => {
+    if (!cleanApiKey) {
+      return { data: null, error: 'مفتاح الـ API فارغ' };
+    }
+
+    const mimeTypeMatch = targetImg.url.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+    const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+    const base64Data = targetImg.url.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+
+    const glossaryPrompt = glossary.length > 0
+      ? `Strictly use this Glossary for translated names/terms: ${glossary.map(g => `${g.original} => ${g.translation}`).join('; ')}.`
+      : '';
+
+    const refContextPrompt = referenceText
+      ? `\nIMPORTANT CONTEXT: Use the following text from a previous chapter as a reference to maintain consistent tone, style, and character naming:\n"""\n${referenceText.substring(0, 5000)}\n"""\n`
+      : '';
+
+    const promptText = ocrOnly
+      ? `You are an expert manga and webtoon OCR system.
+Extract all original texts top to bottom in natural reading order.
+Estimate topPercent (0 to 100) position of each bubble on the page.
+Categorize each block into one of: (${tags.map(t => t.value).join(', ')}).
+Return ONLY a valid JSON array of objects with keys: id, originalText, translatedText, category, topPercent.`
+      : `You are an expert manga and webtoon OCR and translator.
+Extract all texts from the image in reading order (top to bottom).
+Estimate topPercent (0 to 100) relative vertical position on the page for each text bubble.
+Categorize each block into one of these types: (${tags.map(t => t.value).join(', ')}).
+Translate all extracted texts to ${config.targetLanguage === 'ar' ? 'Arabic (العربية)' : 'English'}.
+${glossaryPrompt}
+${refContextPrompt}
+Return ONLY a valid JSON array of objects with keys: id, originalText, translatedText, category, topPercent.`;
+
+    const primaryModel = getEffectiveModel();
+    const modelsToTry = [
+      primaryModel,
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+    ].filter((m, idx, arr) => arr.indexOf(m) === idx);
+
+    let lastErrorDetails = '';
+
+    for (const model of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanApiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { inlineData: { mimeType, data: base64Data } },
+                  { text: promptText },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => null);
+          const msg = errBody?.error?.message || `HTTP ${response.status} (${response.statusText})`;
+          lastErrorDetails = msg;
+
+          if (response.status === 401 || response.status === 403) {
+            return { 
+              data: null, 
+              error: `[Google ${response.status}] ${msg}` 
+            };
+          }
+          continue;
+        }
+
+        const data = await response.json();
+        const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (rawJsonText) {
+          const parsedItems = parseJsonFromResponse(rawJsonText);
+          if (parsedItems && Array.isArray(parsedItems)) {
+            const formatted = parsedItems.map((item, idx) => ({
+              ...item,
+              id: item.id || `item_${idx}_${Date.now()}`,
+              topPercent: item.topPercent ?? Math.min(95, Math.max(5, (idx + 1) * 15)),
+              translatedText: ocrOnly ? item.originalText : item.translatedText,
+            }));
+            return { data: formatted };
+          }
+        }
+      } catch (err: any) {
+        lastErrorDetails = err?.message || 'Network fetch error';
+      }
+    }
+
+    return { data: null, error: lastErrorDetails || 'Failed to connect to Google Gemini' };
+  };
+
+  const handleAnalyzeCurrent = async (ocrOnly = false): Promise<void> => {
+    if (!activeImage) {
+      toast.error(t.selectImageFirst);
+      return;
+    }
+    if (!cleanApiKey) {
+      toast.error(t.enterApiKey);
+      setShowKeyHelpModal(true);
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setCurrentProcessingMsg(lang === 'ar' ? `جاري معالجة واستخراج النصوص بواسطة ${getEffectiveModel()}...` : `Processing with ${getEffectiveModel()}...`);
+
+    const { data: res, error } = await processGeminiRequest(activeImage, ocrOnly);
+    if (res && res.length > 0) {
+      setResultsMap((prev) => ({ ...prev, [activeImage.id]: res }));
+      toast.success(t.successExtract);
+      setView('results');
+      if (activeImage) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            supabase.from('user_history').insert({
+              user_id: session.user.id,
+              image_name: activeImage.name,
+              extracted_count: res.length,
+            });
+          }
+        });
+      }
+    } else {
+      const errorMsg = error || (lang === 'ar' ? 'تحقق من صلاحية مفتاح الـ API' : 'Check your API Key');
+      toast.error(`❌ ${errorMsg}`, { duration: 8000 });
       if (cleanApiKey.startsWith('AQ.')) {
         setShowKeyHelpModal(true);
       }
@@ -747,6 +1435,32 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
           {/* زر تسجيل الدخول والبروفايل */}
           <AuthModal />
+
+          {/* اختيار النموذج (Model Selector) */}
+          <div className="flex items-center gap-1.5 bg-card border border-border rounded-xl px-2 h-9">
+            <Cpu className="w-4 h-4 text-orange-500 shrink-0" />
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="h-7 text-xs font-bold border-0 bg-transparent focus:ring-0 w-44">
+                <SelectValue placeholder={t.selectModel} />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {AVAILABLE_MODELS.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs font-medium">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {selectedModel === 'custom' && (
+              <Input
+                placeholder="gemini-2.0-pro-exp..."
+                value={customModelName}
+                onChange={(e) => setCustomModelName(e.target.value)}
+                className="h-7 text-xs w-36 dir-ltr"
+              />
+            )}
+          </div>
 
           {/* زر مشروع جديد */}
           <Button

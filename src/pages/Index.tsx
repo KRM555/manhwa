@@ -9,7 +9,7 @@ import {
   Sun, Moon, Languages, Images, Trash2,
   ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
   Copy, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
-  BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2
+  BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2, CheckCircle, AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -65,12 +65,12 @@ const DEFAULT_TAGS: TagRule[] = [
   { value: 'other', label: 'أخرى (Other)', prefix: '', suffix: '' },
 ];
 
-const CANDIDATE_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-pro',
-  'gemini-2.0-flash-exp',
+const API_CONFIGS = [
+  { apiVersion: 'v1beta', model: 'gemini-1.5-flash' },
+  { apiVersion: 'v1beta', model: 'gemini-2.0-flash' },
+  { apiVersion: 'v1', model: 'gemini-1.5-flash' },
+  { apiVersion: 'v1beta', model: 'gemini-1.5-flash-8b' },
+  { apiVersion: 'v1beta', model: 'gemini-1.5-pro' },
 ];
 
 const UI_TEXT = {
@@ -96,7 +96,6 @@ const UI_TEXT = {
     paragraph: 'فقرة',
     selectImageFirst: 'الرجاء اختيار صورة واحدة على الأقل',
     enterApiKey: 'يرجى إدخال مفتاح Gemini API Key أولاً',
-    apiKeyInvalidFormat: 'تنبيه: مفاتيح Google Gemini الرسمية تبدأ دائماً بـ AIzaSy. تأكد من نسخ المفتاح الصحيح من Google AI Studio.',
     analyzing: 'جاري معالجة واستخراج النصوص بواسطة Gemini...',
     successExtract: 'تم استخراج النصوص بنجاح!',
     noItemsToExport: 'لا توجد نصوص لتصديرها لهذه الصفحة',
@@ -125,6 +124,7 @@ const UI_TEXT = {
     howToUse: 'كيفية الاستخدام',
     uploadReference: 'إرفاق ملف ترجمة سابقة كمرجع (اختياري)',
     referenceUploaded: 'تم إرفاق المرجع:',
+    testApiKey: 'فحص واختبار المفتاح',
   },
   en: {
     subtitle: 'Webtoon & Manga OCR, Translation and Typesetting tool',
@@ -148,7 +148,6 @@ const UI_TEXT = {
     paragraph: 'Block',
     selectImageFirst: 'Please select at least one image',
     enterApiKey: 'Please enter a valid Gemini API Key first',
-    apiKeyInvalidFormat: 'Notice: Google Gemini API keys start with AIzaSy. Please ensure you copied your key from Google AI Studio.',
     analyzing: 'Processing text with Gemini...',
     successExtract: 'Texts successfully extracted!',
     noItemsToExport: 'No texts available to export',
@@ -177,6 +176,7 @@ const UI_TEXT = {
     howToUse: 'How to Use',
     uploadReference: 'Upload previous translation reference (Optional)',
     referenceUploaded: 'Reference uploaded:',
+    testApiKey: 'Test API Key',
   },
 };
 
@@ -189,6 +189,7 @@ export default function Index() {
   const [view, setView] = useState<'upload' | 'results'>('upload');
   
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
   const [currentProcessingMsg, setCurrentProcessingMsg] = useState<string>('');
 
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
@@ -270,6 +271,39 @@ export default function Index() {
   const activeImage = images[activeImageIndex] || null;
   const currentItems = activeImage ? (resultsMap[activeImage.id] || []) : [];
 
+  const cleanApiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+
+  const handleTestApiKey = async () => {
+    if (!cleanApiKey) {
+      toast.error(t.enterApiKey);
+      return;
+    }
+    setIsTestingKey(true);
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'Respond with OK' }] }]
+          })
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(lang === 'ar' ? '✅ تم التحقق! مفتاح Gemini يعمل بنجاح وبشكل سليم.' : '✅ Gemini API Key is valid and working!');
+      } else {
+        const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        toast.error(`❌ خطأ من Google: ${errMsg}`);
+      }
+    } catch (err: any) {
+      toast.error(`❌ تعذر الاتصال: ${err.message}`);
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
+
   const handleImageSelected = (url: string, name: string) => {
     if (images.length >= 10) {
       toast.error(t.multiImageLimit);
@@ -318,9 +352,9 @@ export default function Index() {
   };
 
   const handleSaveApiKey = (key: string) => {
-    const cleanKey = key.trim();
-    setApiKey(cleanKey);
-    localStorage.setItem('gemini_api_key', cleanKey);
+    const cleaned = key.trim();
+    setApiKey(cleaned);
+    localStorage.setItem('gemini_api_key', cleaned);
   };
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -443,9 +477,35 @@ export default function Index() {
     );
   };
 
-  const processGeminiRequest = async (targetImg: ImageItem, ocrOnly = false): Promise<ExtractedText[] | null> => {
-    const cleanKey = apiKey.trim();
-    if (!cleanKey) return null;
+  const parseJsonFromResponse = (raw: string): ExtractedText[] | null => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      const match = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (match) {
+        try {
+          return JSON.parse(match[1]);
+        } catch {
+          // ignore
+        }
+      }
+      const firstBracket = raw.indexOf('[');
+      const lastBracket = raw.lastIndexOf(']');
+      if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+        try {
+          return JSON.parse(raw.substring(firstBracket, lastBracket + 1));
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return null;
+  };
+
+  const processGeminiRequest = async (targetImg: ImageItem, ocrOnly = false): Promise<{ data: ExtractedText[] | null; error?: string }> => {
+    if (!cleanApiKey) {
+      return { data: null, error: 'مفتاح الـ API فارغ' };
+    }
 
     const mimeTypeMatch = targetImg.url.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
@@ -460,62 +520,51 @@ export default function Index() {
       : '';
 
     const promptText = ocrOnly
-      ? `Extract all original texts top to bottom. Estimate topPercent (0 to 100) position of each bubble on page. Categorize each block into best matching tag.`
-      : `
-        Extract all texts from image in reading order (top to bottom).
-        Estimate topPercent (0 to 100) relative vertical position on page for each text bubble.
-        Categorize each block into one of these types: (${tags.map(t => t.value).join(', ')}).
-        Translate all extracted texts to ${config.targetLanguage === 'ar' ? 'Arabic' : 'English'}.
-        ${glossaryPrompt}
-        ${refContextPrompt}
-      `;
+      ? `You are an expert manga and webtoon OCR system.
+Extract all original texts top to bottom in natural reading order.
+Estimate topPercent (0 to 100) position of each bubble on the page.
+Categorize each block into one of: (${tags.map(t => t.value).join(', ')}).
+Return ONLY a valid JSON array of objects with keys: id, originalText, translatedText, category, topPercent.`
+      : `You are an expert manga and webtoon OCR and translator.
+Extract all texts from the image in reading order (top to bottom).
+Estimate topPercent (0 to 100) relative vertical position on the page for each text bubble.
+Categorize each block into one of these types: (${tags.map(t => t.value).join(', ')}).
+Translate all extracted texts to ${config.targetLanguage === 'ar' ? 'Arabic (العربية)' : 'English'}.
+${glossaryPrompt}
+${refContextPrompt}
+Return ONLY a valid JSON array of objects with keys: id, originalText, translatedText, category, topPercent.`;
 
-    let lastError = '';
+    let lastErrorDetails = '';
 
-    for (const model of CANDIDATE_MODELS) {
+    for (const conf of API_CONFIGS) {
       try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`,
-          {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-api-key': cleanKey
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { inlineData: { mimeType, data: base64Data } },
-                    { text: promptText },
-                  ],
-                },
-              ],
-              generationConfig: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                  type: 'ARRAY',
-                  description: 'Extracted manga blocks with vertical position estimates',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      id: { type: 'STRING' },
-                      originalText: { type: 'STRING' },
-                      translatedText: { type: 'STRING' },
-                      category: { type: 'STRING' },
-                      topPercent: { type: 'NUMBER' },
-                    },
-                    required: ['id', 'originalText', 'translatedText', 'category'],
-                  },
-                },
+        const url = `https://generativelanguage.googleapis.com/${conf.apiVersion}/models/${conf.model}:generateContent?key=${cleanApiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { inlineData: { mimeType, data: base64Data } },
+                  { text: promptText },
+                ],
               },
-            }),
-          }
-        );
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
 
         if (!response.ok) {
           const errBody = await response.json().catch(() => null);
-          lastError = errBody?.error?.message || `HTTP ${response.status} on model ${model}`;
+          const msg = errBody?.error?.message || `HTTP ${response.status} (${response.statusText})`;
+          lastErrorDetails = `[${conf.model} - ${conf.apiVersion}]: ${msg}`;
+          console.warn('Gemini attempt failed:', lastErrorDetails);
           continue;
         }
 
@@ -523,26 +572,23 @@ export default function Index() {
         const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (rawJsonText) {
-          const parsedItems: ExtractedText[] = JSON.parse(rawJsonText);
-          return parsedItems.map((item, idx) => ({
-            ...item,
-            id: item.id || `item_${idx}_${Date.now()}`,
-            topPercent: item.topPercent ?? Math.min(95, Math.max(5, (idx + 1) * 15)),
-            translatedText: ocrOnly ? item.originalText : item.translatedText,
-          }));
+          const parsedItems = parseJsonFromResponse(rawJsonText);
+          if (parsedItems && Array.isArray(parsedItems)) {
+            const formatted = parsedItems.map((item, idx) => ({
+              ...item,
+              id: item.id || `item_${idx}_${Date.now()}`,
+              topPercent: item.topPercent ?? Math.min(95, Math.max(5, (idx + 1) * 15)),
+              translatedText: ocrOnly ? item.originalText : item.translatedText,
+            }));
+            return { data: formatted };
+          }
         }
       } catch (err: any) {
-        lastError = err?.message || 'Network error';
+        lastErrorDetails = err?.message || 'Network fetch error';
       }
     }
 
-    if (lastError) {
-      console.error('Gemini API Error details:', lastError);
-      if (!cleanKey.startsWith('AIzaSy')) {
-        toast.warning(t.apiKeyInvalidFormat);
-      }
-    }
-    return null;
+    return { data: null, error: lastErrorDetails || 'Failed to connect to Google Gemini' };
   };
 
   const handleAnalyzeCurrent = async (ocrOnly = false): Promise<void> => {
@@ -550,19 +596,15 @@ export default function Index() {
       toast.error(t.selectImageFirst);
       return;
     }
-    if (!apiKey.trim()) {
+    if (!cleanApiKey) {
       toast.error(t.enterApiKey);
       return;
     }
 
-    if (!apiKey.trim().startsWith('AIzaSy')) {
-      toast.warning(t.apiKeyInvalidFormat);
-    }
-
     setIsAnalyzing(true);
-    setCurrentProcessingMsg(lang === 'ar' ? 'جاري معالجة الصورة الحالية...' : 'Processing current image...');
+    setCurrentProcessingMsg(lang === 'ar' ? 'جاري معالجة واستخراج نصوص الصفحة...' : 'Processing and extracting text...');
 
-    const res = await processGeminiRequest(activeImage, ocrOnly);
+    const { data: res, error } = await processGeminiRequest(activeImage, ocrOnly);
     if (res && res.length > 0) {
       setResultsMap((prev) => ({ ...prev, [activeImage.id]: res }));
       toast.success(t.successExtract);
@@ -579,11 +621,8 @@ export default function Index() {
         });
       }
     } else {
-      toast.error(
-        lang === 'ar' 
-          ? 'تعذر معالجة الصورة. تأكد من صحة مفتاح Google Gemini API وصلاحيته.' 
-          : 'Failed to process image. Please verify your Google Gemini API Key.'
-      );
+      const errorMsg = error || (lang === 'ar' ? 'تحقق من صلاحية مفتاح الـ API' : 'Check your API Key');
+      toast.error(`❌ خطأ من Google: ${errorMsg}`, { duration: 6000 });
     }
     setIsAnalyzing(false);
   };
@@ -593,27 +632,25 @@ export default function Index() {
       toast.error(t.selectImageFirst);
       return;
     }
-    if (!apiKey.trim()) {
+    if (!cleanApiKey) {
       toast.error(t.enterApiKey);
       return;
     }
 
-    if (!apiKey.trim().startsWith('AIzaSy')) {
-      toast.warning(t.apiKeyInvalidFormat);
-    }
-
     setIsAnalyzing(true);
-    
     const newMap = { ...resultsMap };
     let successCount = 0;
+    let lastError = '';
 
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
       setCurrentProcessingMsg(lang === 'ar' ? `جاري معالجة الصورة (${i + 1} من ${images.length})...` : `Processing image (${i + 1} of ${images.length})...`);
-      const res = await processGeminiRequest(img, ocrOnly);
+      const { data: res, error } = await processGeminiRequest(img, ocrOnly);
       if (res && res.length > 0) {
         newMap[img.id] = res;
         successCount++;
+      } else if (error) {
+        lastError = error;
       }
     }
 
@@ -624,7 +661,7 @@ export default function Index() {
       toast.success(lang === 'ar' ? `تمت معالجة ${successCount} صورة بنجاح!` : `Processed ${successCount} images successfully!`);
       setView('results');
     } else {
-      toast.error(lang === 'ar' ? 'تعذر استخراج النصوص. تحقق من صلاحية مفتاح الـ API.' : 'Failed to extract texts. Check API key validity.');
+      toast.error(`❌ خطأ من Google: ${lastError || 'تعذر استخراج النصوص'}`, { duration: 6000 });
     }
   };
 
@@ -816,20 +853,15 @@ export default function Index() {
             </DialogTrigger>
             <DialogContent className="max-w-lg rounded-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-lg font-bold text-orange-600">كيف يعمل الموقع؟</DialogTitle>
+                <DialogTitle className="text-lg font-bold text-orange-600">كيف يعمل الموقع ومفتاح Gemini؟</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
                 <p>هذه الأداة مصممة لمساعدة المترجمين في استخراج وترجمة نصوص المانجا والويب تون بدقة وسرعة باستخدام الذكاء الاصطناعي (Gemini).</p>
                 <ul className="list-disc list-inside space-y-2">
-                  <li><strong>الخطوة 1:</strong> احصل على مفتاح Gemini API (مجاني) وضعه في الخانة المخصصة بالأعلى.</li>
-                  <li><strong>الخطوة 2:</strong> ارفع صور الفصول أو الفصل كاملاً (كحد أقصى 10 صور في الدفعة أو ملف ZIP).</li>
-                  <li><strong>الخطوة 3 (اختياري):</strong> قم برفع ملف `txt` لترجمة فصل سابق كمرجع ليتعلم منه الذكاء الاصطناعي أسلوبك وأسماء الشخصيات.</li>
-                  <li><strong>الخطوة 4:</strong> اضغط على &quot;تحليل&quot; وانتظر قليلاً. سيقوم الموقع بتفريغ النصوص (OCR)، تحديد نوعها (حوار، صراخ، إلخ)، وترجمتها.</li>
-                  <li><strong>الخطوة 5:</strong> راجع النصوص، عدلها إذا لزم الأمر، ثم قم بتصديرها كملف نصي جاهز للتبييض واللصق!</li>
+                  <li><strong>الخطوة 1:</strong> افتح <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-orange-500 font-bold underline">Google AI Studio</a> وأنشئ مفتاح API (يبدأ بـ <code>AIzaSy...</code>).</li>
+                  <li><strong>الخطوة 2:</strong> ضع المفتاح في الخانة واضغط على أيقونة الفحص للتأكد من اتصاله.</li>
+                  <li><strong>الخطوة 3:</strong> ارفع صور الفصل، واضغط &quot;تحليل الصورة&quot; ليتم التعرف عليها وترجمتها فوراً.</li>
                 </ul>
-                <div className="bg-orange-500/10 p-3 rounded-lg border border-orange-500/20">
-                  <strong>نصيحة:</strong> استخدم &quot;قاموس المصطلحات&quot; لتثبيت ترجمة أسماء الشخصيات والمهارات حتى لا تتغير بين الفصول.
-                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -856,15 +888,26 @@ export default function Index() {
             {lang === 'ar' ? 'English' : 'عربي'}
           </Button>
 
-          {/* خانة الـ API مع شرح */}
+          {/* خانة الـ API مع زر فحص مباشر */}
           <div className="flex items-center gap-1 bg-card border border-border rounded-xl pr-1 overflow-hidden focus-within:ring-1 ring-orange-500">
             <Input
               type="password"
               placeholder={t.apiKeyPlaceholder}
               value={apiKey}
               onChange={(e) => handleSaveApiKey(e.target.value)}
-              className="h-9 text-xs w-full sm:w-48 dir-ltr border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="h-9 text-xs w-full sm:w-44 dir-ltr border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
             />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleTestApiKey}
+              disabled={isTestingKey}
+              title={t.testApiKey}
+              className="h-7 px-2 text-[11px] text-orange-600 dark:text-orange-400 font-bold hover:bg-orange-500/10 rounded-lg gap-1"
+            >
+              {isTestingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+              <span>فحص</span>
+            </Button>
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-muted-foreground hover:text-orange-500">
@@ -876,12 +919,12 @@ export default function Index() {
                   <DialogTitle className="text-lg font-bold">كيف تحصل على مفتاح API؟</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 text-sm text-muted-foreground mt-2">
-                  <p>لكي يعمل الموقع، يحتاج إلى مفتاح للاتصال بنموذج الذكاء الاصطناعي (Gemini). هذا المفتاح مجاني وسهل الحصول عليه.</p>
+                  <p>للحصول على مفتاح مجاني وسريع من Google:</p>
                   <ol className="list-decimal list-inside space-y-2 font-medium text-foreground">
-                    <li>اضغط على الرابط بالأسفل لفتح منصة Google AI Studio.</li>
-                    <li>قم بتسجيل الدخول بحساب جوجل الخاص بك.</li>
-                    <li>اضغط على زر <strong className="text-blue-500">Create API Key</strong>.</li>
-                    <li>انسخ المفتاح الرسمي (يبدأ بـ <code className="text-orange-500 font-mono">AIzaSy...</code>) والصقه في الخانة المخصصة بالأعلى.</li>
+                    <li>افتح موقع <strong className="text-orange-500">Google AI Studio</strong>.</li>
+                    <li>سجل دخولك بحساب Google.</li>
+                    <li>اضغط على <strong>Create API Key</strong>.</li>
+                    <li>انسخ المفتاح الرسمي (يبدأ بـ <code className="text-orange-500 font-mono">AIzaSy...</code>) والصقه هنا.</li>
                   </ol>
                   <Button 
                     className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white font-bold"
@@ -975,7 +1018,7 @@ export default function Index() {
                     <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                       <div className="bg-orange-500 h-full animate-[pulse_2s_ease-in-out_infinite] w-full origin-left scale-x-100"></div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground text-center">يرجى الانتظار، جاري التواصل مع خوادم الذكاء الاصطناعي لاستخراج وترجمة النصوص...</p>
+                    <p className="text-[10px] text-muted-foreground text-center">يرجى الانتظار، جاري التواصل مع خوادم الذكاء الاصطناعي واستخراج النصوص...</p>
                   </div>
                 ) : (
                   <div className="flex flex-wrap justify-center gap-3 w-full animate-in fade-in zoom-in">
@@ -1154,7 +1197,7 @@ export default function Index() {
                         onClick={() => handleCopyText(formatTextWithRules(item.translatedText, item.category))}
                         className="h-7 px-2 text-[11px] gap-1 font-bold text-muted-foreground hover:text-orange-500"
                       >
-                        <Copy className="w-3 h-3" />
+                        <Copy className="w-3.5 h-3.5" />
                         {t.copyBlock}
                       </Button>
 

@@ -264,15 +264,22 @@ export default function Index() {
   const activeImage = images[activeImageIndex] || null;
   const currentItems = activeImage ? (resultsMap[activeImage.id] || []) : [];
 
-  // Strip all invisible characters, spaces, quotes
+  // Strict API Key sanitization
   const cleanApiKey = apiKey.replace(/[\s\r\n\t"']/g, '').trim();
-  const isKeyFormatSuspicious = cleanApiKey.length > 0 && !cleanApiKey.startsWith('AIzaSy');
+  const isInvalidFormat = cleanApiKey.length > 0 && !cleanApiKey.startsWith('AIzaSy');
 
   const handleTestApiKey = async () => {
     if (!cleanApiKey) {
       toast.error(t.enterApiKey);
       return;
     }
+
+    if (isInvalidFormat) {
+      toast.error('المفتاح الحالي يبدأ بـ ' + cleanApiKey.substring(0, 3) + ' وهذا غير صالح! يجب أن يبدأ بـ AIzaSy من Google AI Studio.');
+      setShowKeyHelpModal(true);
+      return;
+    }
+
     setIsTestingKey(true);
     try {
       const res = await fetch(
@@ -349,6 +356,9 @@ export default function Index() {
     const cleaned = key.replace(/[\s\r\n\t"']/g, '').trim();
     setApiKey(cleaned);
     localStorage.setItem('gemini_api_key', cleaned);
+    if (cleaned.startsWith('AQ.')) {
+      setShowKeyHelpModal(true);
+    }
   };
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -501,6 +511,13 @@ export default function Index() {
       return { data: null, error: 'مفتاح الـ API فارغ' };
     }
 
+    if (isInvalidFormat) {
+      return {
+        data: null,
+        error: 'المفتاح المستخدم يبدأ بـ ' + cleanApiKey.substring(0, 3) + ' وليس مفتاح AI Studio (AIzaSy...). يرجى إنشاء مفتاح جديد مجاناً.',
+      };
+    }
+
     const mimeTypeMatch = targetImg.url.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
     const base64Data = targetImg.url.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
@@ -565,11 +582,10 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
           const msg = errBody?.error?.message || `HTTP ${response.status} (${response.statusText})`;
           lastErrorDetails = msg;
 
-          // If 401 (Invalid API Key) or 403, do not keep trying other models in vain
-          if (response.status === 401 || response.status === 403) {
+          if (response.status === 401 || response.status === 403 || response.status === 404) {
             return { 
               data: null, 
-              error: `[401 Unauthorized] مفتاح API غير صالح أو غير معتمد من Google AI Studio: ${msg}` 
+              error: `[Google Error ${response.status}] ${msg}` 
             };
           }
           continue;
@@ -609,6 +625,12 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
       return;
     }
 
+    if (isInvalidFormat) {
+      toast.error('المفتاح الحالي غير صالح. يجب أن يبدأ بـ AIzaSy');
+      setShowKeyHelpModal(true);
+      return;
+    }
+
     setIsAnalyzing(true);
     setCurrentProcessingMsg(lang === 'ar' ? 'جاري معالجة واستخراج نصوص الصفحة...' : 'Processing and extracting text...');
 
@@ -630,7 +652,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
       }
     } else {
       const errorMsg = error || (lang === 'ar' ? 'تحقق من صلاحية مفتاح الـ API' : 'Check your API Key');
-      toast.error(`❌ خطأ من Google: ${errorMsg}`, { duration: 8000 });
+      toast.error(`❌ خطأ: ${errorMsg}`, { duration: 8000 });
       setShowKeyHelpModal(true);
     }
     setIsAnalyzing(false);
@@ -643,6 +665,12 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
     }
     if (!cleanApiKey) {
       toast.error(t.enterApiKey);
+      setShowKeyHelpModal(true);
+      return;
+    }
+
+    if (isInvalidFormat) {
+      toast.error('المفتاح الحالي غير صالح. يجب أن يبدأ بـ AIzaSy');
       setShowKeyHelpModal(true);
       return;
     }
@@ -661,10 +689,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
         successCount++;
       } else if (error) {
         lastError = error;
-        // If 401, stop the loop immediately
-        if (error.includes('401') || error.includes('Unauthorized')) {
-          break;
-        }
+        break;
       }
     }
 
@@ -675,7 +700,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
       toast.success(lang === 'ar' ? `تمت معالجة ${successCount} صورة بنجاح!` : `Processed ${successCount} images successfully!`);
       setView('results');
     } else {
-      toast.error(`❌ خطأ من Google: ${lastError || 'تعذر استخراج النصوص'}`, { duration: 8000 });
+      toast.error(`❌ خطأ: ${lastError || 'تعذر استخراج النصوص'}`, { duration: 8000 });
       setShowKeyHelpModal(true);
     }
   };
@@ -936,21 +961,20 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
       </header>
 
       {/* تنبيه إذا كان المفتاح لا يبدأ بـ AIzaSy */}
-      {isKeyFormatSuspicious && (
-        <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-300">
+      {isInvalidFormat && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-red-700 dark:text-red-300 animate-in fade-in">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
             <span>
-              <strong>تنبيه:</strong> مفتاح الـ API المستخدم لا يبدأ بـ <code className="font-mono bg-amber-500/20 px-1 py-0.5 rounded">AIzaSy</code>. تأكد من إنشائه عبر <strong>Google AI Studio</strong> المجاني وليس من Google Cloud أو موفر آخر.
+              <strong>تنبيه هام:</strong> المفتاح المكتوب يبدأ بـ <code className="font-mono bg-red-500/20 px-1 py-0.5 rounded font-bold">{cleanApiKey.substring(0, 3)}</code> وهذا ليس مفتاح Gemini API الصالح. يجب إنشاء مفتاح يبدأ بـ <code className="font-mono bg-green-500/20 text-green-700 dark:text-green-300 px-1 py-0.5 rounded font-bold">AIzaSy</code> من موقع Google AI Studio.
             </span>
           </div>
           <Button
             size="sm"
-            variant="outline"
             onClick={() => window.open('https://aistudio.google.com/app/apikey', '_blank')}
-            className="h-7 text-[11px] font-bold border-amber-500/40 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 shrink-0"
+            className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 text-xs rounded-xl shrink-0 gap-1 shadow-sm"
           >
-            إنشاء مفتاح AI Studio <ExternalLink className="w-3 h-3 mr-1 ml-1" />
+            إنشاء مفتاح AIzaSy مجاناً <ExternalLink className="w-3.5 h-3.5 ml-1" />
           </Button>
         </div>
       )}
@@ -961,22 +985,22 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2 text-orange-600">
               <KeyRound className="w-5 h-5" />
-              <span>الحصول على مفتاح Google Gemini مجاناً</span>
+              <span>الحصول على مفتاح Google Gemini الصحيح مجاناً</span>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm text-muted-foreground mt-2">
             <p>
-              لتشغيل الترجمة والاستخراج بالذكاء الاصطناعي، تحتاج إلى مفتاح <strong>Google AI Studio</strong> الرسمي:
+              لتشغيل الترجمة والاستخراج بالذكاء الاصطناعي، يرجى إنشاء مفتاح من <strong>Google AI Studio</strong> الرسمي:
             </p>
             <div className="bg-muted/40 p-3 rounded-xl border border-border/60 space-y-2 text-xs text-foreground">
               <p>✅ <strong>المفتاح الصحيح:</strong> يبدأ دائماً بـ <code className="text-orange-500 font-mono font-bold">AIzaSy...</code></p>
-              <p>❌ <strong>مفاتيح أخرى:</strong> التي تبدأ بـ <code className="font-mono text-red-400">AQ...</code> أو غيرها تسبب خطأ <code className="font-mono text-red-400">Invalid authentication credentials</code> لأنها ليست مفاتيح ذكاء اصطناعي.</p>
+              <p>❌ <strong>مفاتيح أخرى:</strong> التي تبدأ بـ <code className="font-mono text-red-400">AQ...</code> ترجع خطأ <code className="font-mono text-red-400">404 (Not Found)</code> لأنها مخصصة لخدمات أخرى وليست للذكاء الاصطناعي.</p>
             </div>
             <ol className="list-decimal list-inside space-y-2 font-medium text-foreground text-xs leading-relaxed">
-              <li>افتح موقع <strong className="text-orange-500">Google AI Studio</strong> (مجاني 100%).</li>
+              <li>اضغط على الزر البرتقالي بالأسفل لفتح <strong className="text-orange-500">Google AI Studio</strong>.</li>
               <li>سجل دخول بحساب Google الخاص بك.</li>
-              <li>اضغط على زر <strong className="text-blue-500">&quot;Get API key&quot;</strong> ثم <strong className="text-blue-500">&quot;Create API key&quot;</strong>.</li>
-              <li>انسخ المفتاح الذي يبدأ بـ <code className="text-orange-500 font-mono">AIzaSy...</code> والصقه في الخانة بالأعلى ثم اضغط &quot;فحص&quot;.</li>
+              <li>اضغط على <strong className="text-blue-500">&quot;Create API key&quot;</strong> ثم اختر <strong className="text-blue-500">&quot;Create API key in new project&quot;</strong>.</li>
+              <li>انسخ المفتاح (يبدأ بـ <code className="text-orange-500 font-mono">AIzaSy...</code>) والصقه في الموقع واضغط &quot;فحص&quot;.</li>
             </ol>
             <div className="pt-2 flex gap-2">
               <Button 

@@ -963,7 +963,7 @@ export default function Index() {
     setIsTestingKey(true);
     try {
       const res = await fetch(
-  `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
+`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
 );
       const data = await res.json();
       

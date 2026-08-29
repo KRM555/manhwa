@@ -67,9 +67,7 @@ const DEFAULT_TAGS: TagRule[] = [
 
 const FALLBACK_MODELS = [
   'gemini-1.5-flash',
-  'gemini-1.5-flash-latest',
   'gemini-2.0-flash',
-  'gemini-2.0-flash-exp',
   'gemini-1.5-pro',
 ];
 
@@ -272,12 +270,15 @@ export default function Index() {
   const activeImage = images[activeImageIndex] || null;
   const currentItems = activeImage ? (resultsMap[activeImage.id] || []) : [];
 
-  const cleanApiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+  // Thorough sanitization of the API key
+  const cleanApiKey = apiKey.replace(/[\s\r\n\t"']/g, '').trim();
   const isKeyFormatSuspicious = cleanApiKey.length > 0 && !cleanApiKey.startsWith('AIzaSy');
 
   const fetchAvailableModels = async (key: string): Promise<string[]> => {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, {
+        headers: { 'x-goog-api-key': key }
+      });
       if (!res.ok) return [];
       const data = await res.json();
       if (Array.isArray(data?.models)) {
@@ -299,7 +300,12 @@ export default function Index() {
     }
     setIsTestingKey(true);
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`);
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`,
+        {
+          headers: { 'x-goog-api-key': cleanApiKey }
+        }
+      );
       const data = await res.json();
       
       if (res.ok && data?.models) {
@@ -368,7 +374,7 @@ export default function Index() {
   };
 
   const handleSaveApiKey = (key: string) => {
-    const cleaned = key.trim();
+    const cleaned = key.replace(/[\s\r\n\t"']/g, '').trim();
     setApiKey(cleaned);
     localStorage.setItem('gemini_api_key', cleaned);
   };
@@ -563,6 +569,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
+              'x-goog-api-key': cleanApiKey,
             },
             body: JSON.stringify({
               contents: [
@@ -751,10 +758,8 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          {/* زر تسجيل الدخول والبروفايل */}
           <AuthModal />
 
-          {/* زر مشروع جديد */}
           <Button
             variant="outline"
             onClick={handleClearAllImages}
@@ -764,7 +769,6 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             {t.newProject}
           </Button>
 
-          {/* نافذة القاموس */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl border-orange-500/40 text-orange-600 dark:text-orange-400">
@@ -804,7 +808,6 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             </DialogContent>
           </Dialog>
 
-          {/* إعدادات العلامات */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="h-9 gap-1.5 text-xs font-bold px-3 rounded-xl">
@@ -867,7 +870,6 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             </DialogContent>
           </Dialog>
 
-          {/* نافذة كيفية الاستخدام (Tutorial) */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="ghost" className="h-9 gap-1 text-xs font-bold px-2 rounded-xl text-muted-foreground hover:text-orange-500">
@@ -890,7 +892,6 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             </DialogContent>
           </Dialog>
 
-          {/* زر ديسكورد */}
           <a 
             href="https://discord.gg/nuaqTHvx" 
             target="_blank" 
@@ -979,7 +980,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
             </p>
             <div className="bg-muted/40 p-3 rounded-xl border border-border/60 space-y-2 text-xs text-foreground">
               <p>✅ <strong>المفتاح الصحيح:</strong> يبدأ دائماً بـ <code className="text-orange-500 font-mono font-bold">AIzaSy...</code></p>
-              <p>❌ <strong>مفاتيح أخرى:</strong> التي تبدأ بـ <code className="font-mono text-red-400">AQ...</code> أو غيرها تسبب خطأ <code className="font-mono text-red-400">404 model not found</code> لأنها ليست مفاتيح ذكاء اصطناعي.</p>
+              <p>❌ <strong>مفاتيح أخرى:</strong> التي تبدأ بـ <code className="font-mono text-red-400">AQ...</code> أو غيرها تسبب خطأ <code className="font-mono text-red-400">Invalid authentication credentials</code> لأنها ليست مفاتيح ذكاء اصطناعي.</p>
             </div>
             <ol className="list-decimal list-inside space-y-2 font-medium text-foreground text-xs leading-relaxed">
               <li>افتح موقع <strong className="text-orange-500">Google AI Studio</strong> (مجاني 100%).</li>

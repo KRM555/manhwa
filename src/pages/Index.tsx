@@ -2,12 +2,13 @@ import { AuthModal } from '@/components/AuthModal';
 import { supabase } from '@/lib/supabase';
 import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
+import { SidebarInfoCards } from '@/components/SidebarInfoCards';
 import { TranslationConfig } from '@/types/manga';
 import { 
-  ArrowLeft, Download, Sparkles, Key, RefreshCw, 
-  Sun, Moon, Languages, Images, ChevronRight, ChevronLeft, Trash2,
+  ArrowLeft, Download, Sparkles, RefreshCw, 
+  Sun, Moon, Languages, Images, Trash2,
   ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
-  Copy, Check, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
+  Copy, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
   BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -65,8 +66,7 @@ const DEFAULT_TAGS: TagRule[] = [
 ];
 
 const CANDIDATE_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
 ];
@@ -184,7 +184,6 @@ export default function Index() {
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [view, setView] = useState<'upload' | 'results'>('upload');
   
-  // حالات التحميل ومعالجة الصور
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [currentProcessingMsg, setCurrentProcessingMsg] = useState<string>('');
 
@@ -228,7 +227,6 @@ export default function Index() {
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
 
-  // مرجع الترجمة (الملف النصي)
   const [referenceText, setReferenceText] = useState<string>('');
   const [referenceFileName, setReferenceFileName] = useState<string>('');
 
@@ -320,7 +318,6 @@ export default function Index() {
     localStorage.setItem('gemini_api_key', key);
   };
 
-  // رفع الملف المرجعي للترجمة
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -417,7 +414,6 @@ export default function Index() {
         if (updatedTranslated.includes(findText)) {
           const count = updatedTranslated.split(findText).length - 1;
           totalReplacements += count;
-          // تم استخدام split و join بدلاً من replaceAll لتجنب الأخطاء
           updatedTranslated = updatedTranslated.split(findText).join(replaceText);
         }
         return { ...item, translatedText: updatedTranslated };
@@ -525,9 +521,15 @@ export default function Index() {
     return null;
   };
 
-  const handleAnalyzeCurrent = async (ocrOnly = false) => {
-    if (!activeImage) return toast.error(t.selectImageFirst);
-    if (!apiKey.trim()) return toast.error(t.enterApiKey);
+  const handleAnalyzeCurrent = async (ocrOnly = false): Promise<void> => {
+    if (!activeImage) {
+      toast.error(t.selectImageFirst);
+      return;
+    }
+    if (!apiKey.trim()) {
+      toast.error(t.enterApiKey);
+      return;
+    }
 
     setIsAnalyzing(true);
     setCurrentProcessingMsg(lang === 'ar' ? 'جاري معالجة الصورة الحالية...' : 'Processing current image...');
@@ -554,9 +556,15 @@ export default function Index() {
     setIsAnalyzing(false);
   };
 
-  const handleAnalyzeAll = async (ocrOnly = false) => {
-    if (images.length === 0) return toast.error(t.selectImageFirst);
-    if (!apiKey.trim()) return toast.error(t.enterApiKey);
+  const handleAnalyzeAll = async (ocrOnly = false): Promise<void> => {
+    if (images.length === 0) {
+      toast.error(t.selectImageFirst);
+      return;
+    }
+    if (!apiKey.trim()) {
+      toast.error(t.enterApiKey);
+      return;
+    }
 
     setIsAnalyzing(true);
     
@@ -574,7 +582,7 @@ export default function Index() {
     setView('results');
   };
 
-  const handleExportText = (scope: 'current' | 'all', textType: 'original' | 'translated') => {
+  const handleExportText = (scope: 'current' | 'all', textType: 'original' | 'translated'): void => {
     const targetImages = scope === 'current' ? (activeImage ? [activeImage] : []) : images;
     if (targetImages.length === 0) return;
 
@@ -592,7 +600,10 @@ export default function Index() {
       }
     });
 
-    if (!fullOutput.trim()) return toast.error(t.noItemsToExport);
+    if (!fullOutput.trim()) {
+      toast.error(t.noItemsToExport);
+      return;
+    }
 
     const blob = new Blob([fullOutput], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -767,11 +778,11 @@ export default function Index() {
                   <li><strong>الخطوة 1:</strong> احصل على مفتاح Gemini API (مجاني) وضعه في الخانة المخصصة بالأعلى.</li>
                   <li><strong>الخطوة 2:</strong> ارفع صور الفصول أو الفصل كاملاً (كحد أقصى 10 صور في الدفعة أو ملف ZIP).</li>
                   <li><strong>الخطوة 3 (اختياري):</strong> قم برفع ملف `txt` لترجمة فصل سابق كمرجع ليتعلم منه الذكاء الاصطناعي أسلوبك وأسماء الشخصيات.</li>
-                  <li><strong>الخطوة 4:</strong> اضغط على "تحليل" وانتظر قليلاً. سيقوم الموقع بتفريغ النصوص (OCR)، تحديد نوعها (حوار، صراخ، إلخ)، وترجمتها.</li>
+                  <li><strong>الخطوة 4:</strong> اضغط على &quot;تحليل&quot; وانتظر قليلاً. سيقوم الموقع بتفريغ النصوص (OCR)، تحديد نوعها (حوار، صراخ، إلخ)، وترجمتها.</li>
                   <li><strong>الخطوة 5:</strong> راجع النصوص، عدلها إذا لزم الأمر، ثم قم بتصديرها كملف نصي جاهز للتبييض واللصق!</li>
                 </ul>
                 <div className="bg-orange-500/10 p-3 rounded-lg border border-orange-500/20">
-                  <strong>نصيحة:</strong> استخدم "قاموس المصطلحات" لتثبيت ترجمة أسماء الشخصيات والمهارات حتى لا تتغير بين الفصول.
+                  <strong>نصيحة:</strong> استخدم &quot;قاموس المصطلحات&quot; لتثبيت ترجمة أسماء الشخصيات والمهارات حتى لا تتغير بين الفصول.
                 </div>
               </div>
             </DialogContent>
@@ -871,69 +882,75 @@ export default function Index() {
 
       {/* Main View Switcher */}
       {view === 'upload' ? (
-        <div className="space-y-6">
-          <UploadZone
-            imagePreview={activeImage?.url || null}
-            fileName={activeImage?.name || null}
-            config={config}
-            isAnalyzing={isAnalyzing} // موجودة مسبقاً، تحجب الرفع أثناء المعالجة
-            onImageSelected={handleImageSelected}
-            onMultipleImagesSelected={handleMultipleImagesSelected}
-            onClearImage={handleClearAllImages}
-            onConfigChange={(updated) => setConfig((prev) => ({ ...prev, ...updated }))}
-            onAnalyze={() => handleAnalyzeCurrent(false)}
-            lang={lang}
-          />
-
-          {/* إضافة خيار رفع ملف الترجمة المرجعي */}
-          <div className="flex flex-col items-center justify-center mt-2">
-            <Label htmlFor="ref-upload" className="cursor-pointer flex items-center gap-2 text-xs text-muted-foreground hover:text-orange-500 transition-colors bg-muted/30 px-4 py-2 rounded-xl border border-dashed border-border/60">
-              <Paperclip className="w-4 h-4" />
-              {referenceFileName ? (
-                <span className="font-bold text-orange-500">{t.referenceUploaded} {referenceFileName}</span>
-              ) : (
-                <span>{t.uploadReference}</span>
-              )}
-            </Label>
-            <input 
-              id="ref-upload" 
-              type="file" 
-              accept=".txt" 
-              className="hidden" 
-              onChange={handleReferenceUpload} 
-              disabled={isAnalyzing}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-8 space-y-6">
+            <UploadZone
+              imagePreview={activeImage?.url || null}
+              fileName={activeImage?.name || null}
+              config={config}
+              isAnalyzing={isAnalyzing}
+              onImageSelected={handleImageSelected}
+              onMultipleImagesSelected={handleMultipleImagesSelected}
+              onClearImage={handleClearAllImages}
+              onConfigChange={(updated) => setConfig((prev) => ({ ...prev, ...updated }))}
+              onAnalyze={() => handleAnalyzeCurrent(false)}
+              lang={lang}
             />
+
+            {/* إضافة خيار رفع ملف الترجمة المرجعي */}
+            <div className="flex flex-col items-center justify-center mt-2">
+              <Label htmlFor="ref-upload" className="cursor-pointer flex items-center gap-2 text-xs text-muted-foreground hover:text-orange-500 transition-colors bg-muted/30 px-4 py-2 rounded-xl border border-dashed border-border/60">
+                <Paperclip className="w-4 h-4" />
+                {referenceFileName ? (
+                  <span className="font-bold text-orange-500">{t.referenceUploaded} {referenceFileName}</span>
+                ) : (
+                  <span>{t.uploadReference}</span>
+                )}
+              </Label>
+              <input 
+                id="ref-upload" 
+                type="file" 
+                accept=".txt" 
+                className="hidden" 
+                onChange={handleReferenceUpload} 
+                disabled={isAnalyzing}
+              />
+            </div>
+
+            {/* أزرار التحليل و شريط التحميل */}
+            {images.length > 0 && (
+              <div className="flex flex-col items-center justify-center gap-4 pt-2 min-h-[60px]">
+                {isAnalyzing ? (
+                  <div className="flex flex-col items-center gap-3 w-full max-w-md bg-card p-4 rounded-2xl border border-orange-500/30 shadow-lg animate-in fade-in zoom-in duration-300">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
+                      <span className="text-sm font-bold text-foreground">{currentProcessingMsg}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-orange-500 h-full animate-[pulse_2s_ease-in-out_infinite] w-full origin-left scale-x-100"></div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground text-center">يرجى الانتظار، جاري التواصل مع خوادم الذكاء الاصطناعي لاستخراج وترجمة النصوص...</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap justify-center gap-3 w-full animate-in fade-in zoom-in">
+                    <Button onClick={() => handleAnalyzeCurrent(false)} className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
+                      <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'تحليل الصورة الحالية' : 'Analyze Current Image'}
+                    </Button>
+                    <Button onClick={() => handleAnalyzeCurrent(true)} variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 font-bold h-11 px-6 rounded-xl gap-2">
+                      <FileText className="w-4 h-4" /> {t.extractOcrOnly}
+                    </Button>
+                    <Button onClick={() => handleAnalyzeAll(false)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
+                      <Play className="w-4 h-4 text-orange-400" /> {t.analyzeAll} ({images.length})
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* أزرار التحليل و شريط التحميل */}
-          {images.length > 0 && (
-            <div className="flex flex-col items-center justify-center gap-4 pt-2 min-h-[60px]">
-              {isAnalyzing ? (
-                <div className="flex flex-col items-center gap-3 w-full max-w-md bg-card p-4 rounded-2xl border border-orange-500/30 shadow-lg animate-in fade-in zoom-in duration-300">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
-                    <span className="text-sm font-bold text-foreground">{currentProcessingMsg}</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-orange-500 h-full animate-[pulse_2s_ease-in-out_infinite] w-full origin-left scale-x-100"></div>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground text-center">يرجى الانتظار، جاري التواصل مع خوادم الذكاء الاصطناعي لاستخراج وترجمة النصوص...</p>
-                </div>
-              ) : (
-                <div className="flex flex-wrap justify-center gap-3 w-full animate-in fade-in zoom-in">
-                  <Button onClick={() => handleAnalyzeCurrent(false)} className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
-                    <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'تحليل الصورة الحالية' : 'Analyze Current Image'}
-                  </Button>
-                  <Button onClick={() => handleAnalyzeCurrent(true)} variant="outline" className="border-orange-500/40 text-orange-600 dark:text-orange-400 font-bold h-11 px-6 rounded-xl gap-2">
-                    <FileText className="w-4 h-4" /> {t.extractOcrOnly}
-                  </Button>
-                  <Button onClick={() => handleAnalyzeAll(false)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-11 px-6 rounded-xl gap-2 shadow-md">
-                    <Play className="w-4 h-4 text-orange-400" /> {t.analyzeAll} ({images.length})
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="lg:col-span-4">
+            <SidebarInfoCards lang={lang} />
+          </div>
         </div>
       ) : (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">

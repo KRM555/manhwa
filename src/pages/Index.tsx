@@ -977,14 +977,15 @@ export default function Index() {
         const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
         toast.error(`❌ خطأ من Google: ${errMsg}`, { duration: 6000 });
         if (cleanApiKey.startsWith('AQ.')) {
-          setShowKeyHelpModal(true);
-        }
+        setShowKeyHelpModal(true);
       }
-    } catch (err: any) {
-      toast.error(`❌ تعذر الاتصال: ${err.message}`);
-    } finally {
-      setIsTestingKey(false);
-    }
+    } // إغلاق كتلة else
+  } // إغلاق كتلة try
+} catch (err) {
+  toast.error(`❌ الاتصال تعذر: ${err instanceof Error ? err.message : "خطأ غير معروف"}`);
+} finally {
+  setIsTestingKey(false);
+}
   };
 
   const handleImageSelected = (url: string, name: string) => {

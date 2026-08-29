@@ -66,9 +66,11 @@ const DEFAULT_TAGS: TagRule[] = [
 ];
 
 const CANDIDATE_MODELS = [
-  'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-pro',
+  'gemini-2.0-flash-exp',
 ];
 
 const UI_TEXT = {
@@ -94,6 +96,7 @@ const UI_TEXT = {
     paragraph: 'فقرة',
     selectImageFirst: 'الرجاء اختيار صورة واحدة على الأقل',
     enterApiKey: 'يرجى إدخال مفتاح Gemini API Key أولاً',
+    apiKeyInvalidFormat: 'تنبيه: مفاتيح Google Gemini الرسمية تبدأ دائماً بـ AIzaSy. تأكد من نسخ المفتاح الصحيح من Google AI Studio.',
     analyzing: 'جاري معالجة واستخراج النصوص بواسطة Gemini...',
     successExtract: 'تم استخراج النصوص بنجاح!',
     noItemsToExport: 'لا توجد نصوص لتصديرها لهذه الصفحة',
@@ -145,6 +148,7 @@ const UI_TEXT = {
     paragraph: 'Block',
     selectImageFirst: 'Please select at least one image',
     enterApiKey: 'Please enter a valid Gemini API Key first',
+    apiKeyInvalidFormat: 'Notice: Google Gemini API keys start with AIzaSy. Please ensure you copied your key from Google AI Studio.',
     analyzing: 'Processing text with Gemini...',
     successExtract: 'Texts successfully extracted!',
     noItemsToExport: 'No texts available to export',
@@ -314,8 +318,9 @@ export default function Index() {
   };
 
   const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('gemini_api_key', key);
+    const cleanKey = key.trim();
+    setApiKey(cleanKey);
+    localStorage.setItem('gemini_api_key', cleanKey);
   };
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -439,6 +444,9 @@ export default function Index() {
   };
 
   const processGeminiRequest = async (targetImg: ImageItem, ocrOnly = false): Promise<ExtractedText[] | null> => {
+    const cleanKey = apiKey.trim();
+    if (!cleanKey) return null;
+
     const mimeTypeMatch = targetImg.url.match(/^data:(image\/[a-zA-Z+]+);base64,/);
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
     const base64Data = targetImg.url.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
@@ -462,13 +470,18 @@ export default function Index() {
         ${refContextPrompt}
       `;
 
+    let lastError = '';
+
     for (const model of CANDIDATE_MODELS) {
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': cleanKey
+            },
             body: JSON.stringify({
               contents: [
                 {
@@ -500,7 +513,11 @@ export default function Index() {
           }
         );
 
-        if (!response.ok) continue;
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => null);
+          lastError = errBody?.error?.message || `HTTP ${response.status} on model ${model}`;
+          continue;
+        }
 
         const data = await response.json();
         const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -514,8 +531,15 @@ export default function Index() {
             translatedText: ocrOnly ? item.originalText : item.translatedText,
           }));
         }
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        lastError = err?.message || 'Network error';
+      }
+    }
+
+    if (lastError) {
+      console.error('Gemini API Error details:', lastError);
+      if (!cleanKey.startsWith('AIzaSy')) {
+        toast.warning(t.apiKeyInvalidFormat);
       }
     }
     return null;
@@ -531,11 +555,15 @@ export default function Index() {
       return;
     }
 
+    if (!apiKey.trim().startsWith('AIzaSy')) {
+      toast.warning(t.apiKeyInvalidFormat);
+    }
+
     setIsAnalyzing(true);
     setCurrentProcessingMsg(lang === 'ar' ? 'جاري معالجة الصورة الحالية...' : 'Processing current image...');
 
     const res = await processGeminiRequest(activeImage, ocrOnly);
-    if (res) {
+    if (res && res.length > 0) {
       setResultsMap((prev) => ({ ...prev, [activeImage.id]: res }));
       toast.success(t.successExtract);
       setView('results');
@@ -551,7 +579,11 @@ export default function Index() {
         });
       }
     } else {
-      toast.error(lang === 'ar' ? 'حدث خطأ أثناء معالجة الصورة' : 'Failed to process image');
+      toast.error(
+        lang === 'ar' 
+          ? 'تعذر معالجة الصورة. تأكد من صحة مفتاح Google Gemini API وصلاحيته.' 
+          : 'Failed to process image. Please verify your Google Gemini API Key.'
+      );
     }
     setIsAnalyzing(false);
   };
@@ -566,20 +598,34 @@ export default function Index() {
       return;
     }
 
+    if (!apiKey.trim().startsWith('AIzaSy')) {
+      toast.warning(t.apiKeyInvalidFormat);
+    }
+
     setIsAnalyzing(true);
     
     const newMap = { ...resultsMap };
+    let successCount = 0;
+
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
       setCurrentProcessingMsg(lang === 'ar' ? `جاري معالجة الصورة (${i + 1} من ${images.length})...` : `Processing image (${i + 1} of ${images.length})...`);
       const res = await processGeminiRequest(img, ocrOnly);
-      if (res) newMap[img.id] = res;
+      if (res && res.length > 0) {
+        newMap[img.id] = res;
+        successCount++;
+      }
     }
 
     setResultsMap(newMap);
     setIsAnalyzing(false);
-    toast.success(lang === 'ar' ? 'تمت معالجة كافة الصور بنجاح!' : 'All images processed successfully!');
-    setView('results');
+
+    if (successCount > 0) {
+      toast.success(lang === 'ar' ? `تمت معالجة ${successCount} صورة بنجاح!` : `Processed ${successCount} images successfully!`);
+      setView('results');
+    } else {
+      toast.error(lang === 'ar' ? 'تعذر استخراج النصوص. تحقق من صلاحية مفتاح الـ API.' : 'Failed to extract texts. Check API key validity.');
+    }
   };
 
   const handleExportText = (scope: 'current' | 'all', textType: 'original' | 'translated'): void => {
@@ -835,7 +881,7 @@ export default function Index() {
                     <li>اضغط على الرابط بالأسفل لفتح منصة Google AI Studio.</li>
                     <li>قم بتسجيل الدخول بحساب جوجل الخاص بك.</li>
                     <li>اضغط على زر <strong className="text-blue-500">Create API Key</strong>.</li>
-                    <li>انسخ المفتاح الطويل الذي يظهر لك والصقه في الخانة المخصصة بالأعلى.</li>
+                    <li>انسخ المفتاح الرسمي (يبدأ بـ <code className="text-orange-500 font-mono">AIzaSy...</code>) والصقه في الخانة المخصصة بالأعلى.</li>
                   </ol>
                   <Button 
                     className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white font-bold"

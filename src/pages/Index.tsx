@@ -961,28 +961,27 @@ export default function Index() {
     }
 
     setIsTestingKey(true);
-  try {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
-  );
-
-  const data = await res.json();
-
-  if (res.ok && data?.models) {
-    toast.success(
-      lang === 'ar'
-        ? `✅ المفتاح صحيح وفعال 100%! متصل بنجاح مع Google Gemini (${data.models.length} نماذج متاحة).`
-        : `✅ Gemini API Key is valid! (${data.models.length} models available).`
-    );
-  } else {
-    const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-    toast.error(`❌ خطأ من Google: ${errMsg}`, { duration: 6000 });
-    
-    if (cleanApiKey.startsWith('AQ.')) {
-      setShowKeyHelpModal(true);
-    }
-  }
-} catch (err) {
+    try {
+      const res = await fetch(
+`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanApiKey}`
+);
+      const data = await res.json();
+      
+      if (res.ok && data?.models) {
+        toast.success(
+          lang === 'ar' 
+            ? `✅ المفتاح صحيح وفعال 100%! متصل بنجاح مع Google Gemini (${data.models.length} نماذج متاحة).` 
+            : `✅ Gemini API Key is valid! (${data.models.length} models available).`
+        );
+      } else {
+        const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        toast.error(`❌ خطأ من Google: ${errMsg}`, { duration: 6000 });
+        if (cleanApiKey.startsWith('AQ.')) {
+        setShowKeyHelpModal(true);
+      }
+    } // إغلاق كتلة else
+  } // إغلاق كتلة try
+ try{}  catch (err) {
   toast.error(`❌ الاتصال تعذر: ${err instanceof Error ? err.message : "خطأ غير معروف"}`);
 } finally {
   setIsTestingKey(false);

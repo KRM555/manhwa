@@ -4,13 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { SidebarInfoCards } from '@/components/SidebarInfoCards';
 import { TranslationConfig } from '@/types/manga';
-import { 
-  ArrowLeft, Download, Sparkles, RefreshCw, 
-  Sun, Moon, Languages, Images, Trash2,
-  ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown,
-  Copy, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus,
-  BookOpen, Eye, EyeOff, HelpCircle, Info, Paperclip, Loader2, CheckCircle, AlertTriangle, KeyRound, Cpu
-} from 'lucide-react';
+import { ArrowLeft, Download, Sparkles, RefreshCw, Sun, Moon, Languages, Images, Trash2, ExternalLink, FileText, Plus, Settings2, Play, FileDown, ChevronDown, Copy, ArrowUp, ArrowDown, Search, Replace, RotateCcw, FolderPlus, BookOpen, Eye, EyeOff, CircleHelp as HelpCircle, Info, Paperclip, Loader as Loader2, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, KeyRound, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -66,10 +60,8 @@ const DEFAULT_TAGS: TagRule[] = [
 ];
 
 const AVAILABLE_MODELS = [
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (الأسرع والأحدث)' },
-  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (سريع ودقيق)' },
-  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (أعلى جودة وسياق)' },
-  { id: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental' },
+  { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash (الأسرع والأحدث)' },
+  { id: 'gemini-3.6-pro', label: 'Gemini 3.6 Pro (أعلى جودة وسياق)' },
   { id: 'custom', label: 'نموذج مخصص (Custom Model)...' }
 ];
 
@@ -202,7 +194,7 @@ export default function Index() {
   });
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem('gemini_selected_model') || 'gemini-2.0-flash';
+    return localStorage.getItem('gemini_selected_model') || 'gemini-3.7-flash';
   });
   const [customModelName, setCustomModelName] = useState<string>('');
 
@@ -290,7 +282,7 @@ export default function Index() {
     if (selectedModel === 'custom' && customModelName.trim()) {
       return customModelName.trim();
     }
-    return selectedModel || 'gemini-2.0-flash';
+    return selectedModel || 'gemini-3.7-flash';
   };
 
   const handleTestApiKey = async () => {
@@ -559,9 +551,8 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
     const primaryModel = getEffectiveModel();
     const modelsToTry = [
       primaryModel,
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
+      'gemini-3.7-flash',
+      'gemini-3.6-pro',
     ].filter((m, idx, arr) => arr.indexOf(m) === idx);
 
     let lastErrorDetails = '';
@@ -793,7 +784,7 @@ Return ONLY a valid JSON array of objects with keys: id, originalText, translate
 
             {selectedModel === 'custom' && (
               <Input
-                placeholder="gemini-2.0-pro-exp..."
+                placeholder="gemini-3.7-flash..."
                 value={customModelName}
                 onChange={(e) => setCustomModelName(e.target.value)}
                 className="h-7 text-xs w-36 dir-ltr"
